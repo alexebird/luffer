@@ -27,7 +27,7 @@
 ;t.datetime "updated_at"
 
 (defentity plays
-  (entity-fields :id :user_id :track_id :source :created_at)
+  (entity-fields :id :user_id :track_id :api_client_id :source :created_at)
   (belongs-to users {:fk :user_id})
   (belongs-to tracks {:fk :track_id})
   (belongs-to api_clients {:fk :api_client_id}))
@@ -135,8 +135,10 @@
 (def venues-by-id (id-doc-map (select venues)))
 (def shows-by-id  (id-doc-map (select shows)))
 (def tracks-by-id (id-doc-map (select tracks)))
-(def api_clients-by-id (id-doc-map (select api_clients)))
+(def api-clients-by-id (id-doc-map (select api_clients)))
 (def users-by-id (id-doc-map (select users)))
+
+;; idea: use transform to make column names unique
 
 (defn join-by-id
   "Join in-memory models. Iterate the primary collection and set a key for each matching lookup-collection model."
@@ -145,7 +147,36 @@
                   [pid (assoc pm pkey (get lcoll (get pm lkey)))])
                 pcoll)))
 
-(pprint (select-keys (-> (join-by-id shows-by-id venues-by-id :venue :venue_id) (join-by-id tours-by-id :tour :tour_id)) [891]))
+(defn show-fully-stocked [id]
+  (get (-> (join-by-id shows-by-id venues-by-id :venue :venue_id)
+           (join-by-id tours-by-id :tour :tour_id))
+       id))
+
+(defn assoc-user
+  "associate the user with the play"
+  [play]
+  (let [uid (get play :user_id)
+        usr (last (get (vec users-by-id) uid))]
+    (assoc play :user usr)))
+
+(defn assoc-track
+  "associate the track with the play"
+  [play]
+  (let [tid (get play :track_id)
+        t (last (get (vec tracks-by-id) tid))]
+    (assoc play :track t)))
+
+
+(defn assoc-api-client
+  "associate the api-client with the play"
+  [play]
+  (let [acid (get play :api_client_id)
+        ac (last (get (vec api-clients-by-id) acid))]
+    (assoc play :api_client ac)))
+
+(defmacro select-plays-stocked [& clauses]
+  `(map #(-> (assoc-user %) (assoc-api-client) (assoc-track))
+       (select plays ~@clauses)))
 
 (defn -main
   "I don't do a whole lot ... yet."
