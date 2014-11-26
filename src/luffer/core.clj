@@ -233,6 +233,18 @@
 
 (def pc (atom 0))
 
+(defn buglet []
+  (reset! pc 0)
+  (println (format "new future [%,d,%,d)" 0 nil))
+  (select-in-batches (-> (select* plays) (assoc , :fields [:id])) 0 1350000 nil
+                           (fn [bat]
+                             (let [joined-bat (assoc bat :batch (join-plays (:batch bat)))]
+                               (swap! pc + (-> bat :batch count))
+                               (println (format "batched %,d plays. total=%,d" (-> bat :batch count) @pc))
+                               (println '(write-batch-to-file "./tmp/batch-%d.json" joined-bat)))))
+  (println (format "done with [%,d,%,d). total=%,d" 0 nil @pc)))
+
+
 (defn -main [& args]
   (let [batch-size 15000
         concurrency 1
@@ -241,15 +253,15 @@
         id-stop (+ quoti (- batch-size (mod quoti batch-size)))]
     (reset! batchno 1)
     (reset! pc 0)
-    (println (format "there are %d plays" cnt))
+    (println (format "there are %,d plays" cnt))
     (loop [i 0, start 0, stop id-stop]
       (when (< i concurrency)
-        (println (format "new future   [%d,%d)" start stop))
+        (println (format "new future [%,d,%,d)" start stop))
         (select-in-batches (select* plays) start batch-size stop
                            (fn [bat]
                              (let [joined-bat (assoc bat :batch (join-plays (:batch bat)))]
                                (swap! pc + (-> bat :batch count))
-                               (println (format "did %d plays. total=%d" (-> bat :batch count) @pc))
+                               (println (format "batched %,d plays. total=%,d" (-> bat :batch count) @pc))
                                (write-batch-to-file "./tmp/batch-%d.json" joined-bat))))
-        (println (format "done with    ^ [%d,%d). total=%d" start stop @pc))
+        (println (format "done with [%,d,%,d). total=%,d" start stop @pc))
         (recur (inc i) (+ start id-stop) (if (= (inc i) concurrency) nil (+ stop id-stop)))))))
