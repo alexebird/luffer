@@ -195,7 +195,7 @@
   "write bulk action line and source document line"
   [stream p]
   (do
-    (encode-stream {:index {:_index "plays.exp-1" :_type "play" :_id (:id p)}} stream)
+    (encode-stream {:index {:_id (:id p)}} stream)
     (.write stream "\n")
     (encode-stream p stream)
     (.write stream "\n")))
@@ -236,7 +236,7 @@
 
 (defn -main [& args]
   (let [batch-size 10000
-        concurrency 1
+        concurrency 8
         cnt (-> (exec-raw "SELECT COUNT(*) AS cnt FROM plays" :results) first :cnt)
         quoti (int (/ cnt concurrency))
         id-stop (+ quoti (- batch-size (mod quoti batch-size)))]
@@ -250,13 +250,13 @@
                   id-stop)]
       (when (< i concurrency)
         (println (format "new future [%,d, %,d)" start stop))
-        (select-in-batches (select* plays) start batch-size stop
-                           (fn [bat]
-                             (let [joined-bat (assoc bat :batch (join-plays (:batch bat)))]
-                               (swap! pc + (-> bat :batch count))
-                               (println (format "batched %,d plays. total=%,d" (-> bat :batch count) @pc))
-                               (write-batch-to-file "./tmp/batch-%d.json" joined-bat))))
-        (println (format "done with [%,d, %,d). total=%,d" start stop @pc))
+        (future (time (select-in-batches (select* plays) start batch-size stop
+                                         (fn [bat]
+                                           (let [joined-bat (assoc bat :batch (join-plays (:batch bat)))]
+                                             (swap! pc + (-> bat :batch count))
+                                             (println (format "batched %,d plays. total=%,d" (-> bat :batch count) @pc))
+                                             (write-batch-to-file "./tmp/batch-%d.json" joined-bat)))))
+                (println (format "done with [%,d, %,d). total=%,d" start stop @pc)))
         (recur (inc i) (+ start id-stop) (if (= (inc i) concurrency)
                                            nil
                                            (+ stop id-stop)))))))
