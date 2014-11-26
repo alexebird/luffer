@@ -6,7 +6,9 @@
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [korma "0.3.0"]
                  [org.clojure/java.jdbc "0.3.6"]
-                 [postgresql "9.3-1102.jdbc41"]]
+                 [postgresql "9.3-1102.jdbc41"]
+                 [cheshire "5.3.1"]
+                 [org.clojure/tools.trace "0.7.5"]]
   :main ^:skip-aot luffer.core
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}}

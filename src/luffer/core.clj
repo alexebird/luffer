@@ -1,9 +1,11 @@
 (ns luffer.core
   (:gen-class)
   (:require [clojure.string :as str])
+  (:require [cheshire.core :refer :all])
   (:use [clojure.pprint]
         [korma.core]
-        [korma.db]))
+        [korma.db]
+        [clojure.tools.trace]))
 
 (defdb db (postgres {:db "pts_dev"
                      :user "ptsuser"
@@ -13,7 +15,7 @@
                      }))
 
 
-(declare plays users tracks shows tours venues api_client)
+(declare plays users tracks shows tours venues api_clients)
 
 ;; play model
 ;t.integer  "user_id"
@@ -142,15 +144,26 @@
 
 (defn join-by-id
   "Join in-memory models. Iterate the primary collection and set a key for each matching lookup-collection model."
-  [pcoll lcoll pkey lkey]
-  (into {} (map (fn [[pid pm]]
-                  [pid (assoc pm pkey (get lcoll (get pm lkey)))])
-                pcoll)))
+  ([pcoll lcoll pkey lkey] (join-by-id pcoll lcoll pkey lkey nil))
+  ([pcoll lcoll pkey lkey join-fn]
+     (into {} (map (fn [[pid pm]]
+                     (let [joined-pm (assoc pm pkey (get lcoll (get pm lkey)))]
+                       [pid (if join-fn
+                              (join-fn joined-pm)
+                              joined-pm)]))
+                   pcoll))))
 
-(defn show-fully-stocked [id]
-  (get (-> (join-by-id shows-by-id venues-by-id :venue :venue_id)
-           (join-by-id tours-by-id :tour :tour_id))
-       id))
+(def tracks-joined
+  (join-by-id tracks-by-id
+              (-> (join-by-id shows-by-id venues-by-id :venue :venue_id)
+                  (join-by-id tours-by-id :tour :tour_id))
+              :show :show_id
+              (fn [track]
+                (assoc track :unique_slug (str/join "/" [(get-in track [:show :date])
+                                                         (get-in track [:slug])])))))
+
+(defn track-fully-stocked [id]
+  (get tracks-joined id))
 
 (defn assoc-user
   "associate the user with the play"
@@ -163,9 +176,8 @@
   "associate the track with the play"
   [play]
   (let [tid (get play :track_id)
-        t (last (get (vec tracks-by-id) tid))]
+        t (track-fully-stocked tid)]
     (assoc play :track t)))
-
 
 (defn assoc-api-client
   "associate the api-client with the play"
@@ -174,11 +186,70 @@
         ac (last (get (vec api-clients-by-id) acid))]
     (assoc play :api_client ac)))
 
-(defmacro select-plays-stocked [& clauses]
-  `(map #(-> (assoc-user %) (assoc-api-client) (assoc-track))
-       (select plays ~@clauses)))
+(defn join-plays
+  "add user, api_client and track models to each play"
+  [plays]
+  (map #(-> (assoc-user %) (assoc-api-client) (assoc-track)) plays))
 
-(defn -main
-  "I don't do a whole lot ... yet."
-  [& args]
-  (println "Hello, World!"))
+(defn write-bulk-play
+  "write bulk action line and source document line"
+  [stream p]
+  (do
+    (encode-stream {:index {:_index "plays.exp-1" :_type "play" :_id (:id p)}} stream)
+    (.write stream "\n")
+    (encode-stream p stream)
+    (.write stream "\n")))
+
+(defn write-bulk-plays [stream ps]
+  (doseq [p ps] (write-bulk-play stream p)))
+
+(def batchno (atom 1))
+
+(defn select-in-batches
+  ([query limit batch-fn] (select-in-batches query limit nil batch-fn))
+
+  ([query limit stop-id batch-fn] (select-in-batches query 0 limit stop-id batch-fn))
+
+  ([query start lim stop-id batch-fn]
+     (let [query   (-> query (order :id :ASC) (limit lim))
+           query   (if stop-id (-> query (where {:id [< stop-id]})) query)
+           records (-> query (where {:id [>= start]}) exec)
+           internal-batch-fn (fn [batch batch-no]
+                               (when batch-fn
+                                 (batch-fn {:batch batch :batchno batch-no})))
+           ]
+        (if-not (empty? records)
+          (internal-batch-fn records @batchno))
+       (loop [recs records]
+         (when-let [recs (not-empty (-> query (where {:id [> (:id (last recs))]}) exec))]
+           (internal-batch-fn recs (swap! batchno inc))
+           (recur recs))))))
+
+(defn write-batch-to-file
+  "write a damn batch. fname can include a '%d' for the batch number."
+  [fname-pattern batch]
+  (with-open [stream (clojure.java.io/writer (format fname-pattern (:batchno batch)))]
+    (write-bulk-plays stream (:batch batch))))
+
+(def pc (atom 0))
+
+(defn -main [& args]
+  (let [batch-size 15000
+        concurrency 1
+        cnt (-> (exec-raw "SELECT COUNT(*) AS cnt FROM plays" :results) first :cnt)
+        quoti (int (/ cnt concurrency))
+        id-stop (+ quoti (- batch-size (mod quoti batch-size)))]
+    (reset! batchno 1)
+    (reset! pc 0)
+    (println (format "there are %d plays" cnt))
+    (loop [i 0, start 0, stop id-stop]
+      (when (< i concurrency)
+        (println (format "new future   [%d,%d)" start stop))
+        (select-in-batches (select* plays) start batch-size stop
+                           (fn [bat]
+                             (let [joined-bat (assoc bat :batch (join-plays (:batch bat)))]
+                               (swap! pc + (-> bat :batch count))
+                               (println (format "did %d plays. total=%d" (-> bat :batch count) @pc))
+                               (write-batch-to-file "./tmp/batch-%d.json" joined-bat))))
+        (println (format "done with    ^ [%d,%d). total=%d" start stop @pc))
+        (recur (inc i) (+ start id-stop) (if (= (inc i) concurrency) nil (+ stop id-stop)))))))
