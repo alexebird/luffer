@@ -213,15 +213,16 @@
   ([query start lim stop-id batch-fn]
      (let [query   (-> query (order :id :ASC) (limit lim))
            query   (if stop-id (-> query (where {:id [< stop-id]})) query)
-           records (-> query (where {:id [>= start]}) exec)
+           query-fn exec
+           records (-> query (where {:id [>= start]}) query-fn)
            internal-batch-fn (fn [batch batch-no]
                                (when batch-fn
                                  (batch-fn {:batch batch :batchno batch-no})))
            ]
-        (if-not (empty? records)
-          (internal-batch-fn records @batchno))
+       (if-not (empty? records)
+         (internal-batch-fn records @batchno))
        (loop [recs records]
-         (when-let [recs (not-empty (-> query (where {:id [> (:id (last recs))]}) exec))]
+         (when-let [recs (not-empty (-> query (where {:id [> (:id (last recs))]}) query-fn))]
            (internal-batch-fn recs (swap! batchno inc))
            (recur recs))))))
 
@@ -233,35 +234,29 @@
 
 (def pc (atom 0))
 
-(defn buglet []
-  (reset! pc 0)
-  (println (format "new future [%,d,%,d)" 0 nil))
-  (select-in-batches (-> (select* plays) (assoc , :fields [:id])) 0 1350000 nil
-                           (fn [bat]
-                             (let [joined-bat (assoc bat :batch (join-plays (:batch bat)))]
-                               (swap! pc + (-> bat :batch count))
-                               (println (format "batched %,d plays. total=%,d" (-> bat :batch count) @pc))
-                               (println '(write-batch-to-file "./tmp/batch-%d.json" joined-bat)))))
-  (println (format "done with [%,d,%,d). total=%,d" 0 nil @pc)))
-
-
 (defn -main [& args]
-  (let [batch-size 15000
+  (let [batch-size 10000
         concurrency 1
         cnt (-> (exec-raw "SELECT COUNT(*) AS cnt FROM plays" :results) first :cnt)
         quoti (int (/ cnt concurrency))
         id-stop (+ quoti (- batch-size (mod quoti batch-size)))]
     (reset! batchno 1)
     (reset! pc 0)
-    (println (format "there are %,d plays" cnt))
-    (loop [i 0, start 0, stop id-stop]
+    (println (format "there are %,d plays, id-stop is %,d" cnt id-stop))
+    (loop [i 0
+           start 0
+           stop (if (= (inc i) concurrency)
+                  nil
+                  id-stop)]
       (when (< i concurrency)
-        (println (format "new future [%,d,%,d)" start stop))
+        (println (format "new future [%,d, %,d)" start stop))
         (select-in-batches (select* plays) start batch-size stop
                            (fn [bat]
                              (let [joined-bat (assoc bat :batch (join-plays (:batch bat)))]
                                (swap! pc + (-> bat :batch count))
                                (println (format "batched %,d plays. total=%,d" (-> bat :batch count) @pc))
                                (write-batch-to-file "./tmp/batch-%d.json" joined-bat))))
-        (println (format "done with [%,d,%,d). total=%,d" start stop @pc))
-        (recur (inc i) (+ start id-stop) (if (= (inc i) concurrency) nil (+ stop id-stop)))))))
+        (println (format "done with [%,d, %,d). total=%,d" start stop @pc))
+        (recur (inc i) (+ start id-stop) (if (= (inc i) concurrency)
+                                           nil
+                                           (+ stop id-stop)))))))
