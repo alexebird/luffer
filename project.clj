@@ -8,7 +8,8 @@
                  [org.clojure/java.jdbc "0.3.6"]
                  [postgresql "9.3-1102.jdbc41"]
                  [cheshire "5.3.1"]
-                 [org.clojure/tools.trace "0.7.5"]]
+                 [org.clojure/tools.trace "0.7.5"]
+                 [clj-http "1.0.1"]]
   :main ^:skip-aot luffer.core
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}}
