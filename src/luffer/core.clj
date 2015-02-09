@@ -1,8 +1,10 @@
 (ns luffer.core
   (:gen-class)
-  (:require [clojure.string :as str])
-  (:require [cheshire.core :refer :all])
-  (:require [clj-http.client :as client])
+  (:require [clojure.string :as str]
+            [cheshire.core :refer :all]
+            [clj-http.client :as client]
+            [clojurewerkz.elastisch.rest      :as esr]
+            [clojurewerkz.elastisch.rest.bulk :as esb])
   (:use [clojure.pprint]
         [korma.core]
         [korma.db]
@@ -11,6 +13,8 @@
 (def http-auth {:basic-auth  "bird:fqKyt6muengOEaatv"})
 (def play-counter  (atom 0))
 (def batch-counter (atom 1))
+
+(def es-conn (esr/connect "http://127.0.0.1:9200"))
 
 (defdb db (postgres {:db "pts_dev"
                      :user "ptsuser"
@@ -194,35 +198,47 @@
 (defn join-play-with-models
   "add user, api_client and track models to the play"
   [play]
-  (-> (assoc-user play) (assoc-api-client) (assoc-track)))
+  (-> (assoc-user play) assoc-api-client assoc-track))
+
+(def es-index "plays.exp.1")
+
+(defn add-bulk-fields
+  "add _index and _type fields"
+  [play]
+  (merge play {:_index es-index :_type "play"}))
 
 (defn write-bulk-record
   "write bulk action line and source document line"
   [stream rec]
-  ;; (.write stream "kitties\n")
   (do
-    ;; (encode-stream {:index {:_id (:id rec)}} stream)
     (.write stream "{\"index\":{}}\n")
     (encode-stream rec stream)
-    (.write stream "\n"))
-  )
+    (.write stream "\n")))
 
 (defn select-in-batches
-  ([query start-id stop-id size batch-handler]
-     (let [query   (-> query (order :id :ASC) (limit size))
-           query   (if stop-id (-> query (where {:id [< stop-id]})) query)
-           query-fn exec
-           records (-> query (where {:id [>= start-id]}) query-fn)
-           internal-batch-fn (fn [records]
-                               (when batch-handler
-                                 (batch-handler records)))
-           ]
-       (if-not (empty? records)
-         (internal-batch-fn records))
-       (loop [recs records]
-         (when-let [recs (not-empty (-> query (where {:id [> (:id (last recs))]}) query-fn))]
-           (internal-batch-fn recs)
-           (recur recs))))))
+  [query start-id stop-id size batch-fn]
+  (let [query   (-> query (order :id :ASC) (limit size))
+        query   (if stop-id (-> query (where {:id [< stop-id]})) query)
+        query-fn exec
+        records (-> query (where {:id [>= start-id]}) query-fn)
+        internal-batch-fn (fn [records]
+                            (when batch-fn
+                              (batch-fn records)))
+        ]
+    (if-not (empty? records)
+      (internal-batch-fn records))
+    (loop [recs records]
+      (when-let [recs (not-empty (-> query (where {:id [> (:id (last recs))]}) query-fn))]
+        (internal-batch-fn recs)
+        (recur recs)))))
+
+(defn select-in-batches-as-docs
+  [query start-id stop-id size batch-fn]
+  (let [internal-batch-fn (fn [recs]
+                            (when batch-fn 
+                              (batch-fn (map join-play-with-models recs))))
+        ]
+    (select-in-batches query start-id stop-id size internal-batch-fn)))
 
 (defn write-records-to-file [recs fname]
   (with-open [stream (clojure.java.io/writer fname)]
@@ -236,13 +252,22 @@
 (defn round-to-nearest-n [n val]
   (+ val (- n (mod val n))))
 
-(defn handle-batch [recs]
-  (let [recs (map join-play-with-models recs)
-        recs-count (count recs)
+(defn- inc-play-counter! [amount]
+  (swap! play-counter + amount))
+
+(defn handle-batch-files [docs]
+  (let [docs-count (count docs)
         fname (format "./tmp/batch-%d.json" (swap! batch-counter inc))]
-    (swap! play-counter + recs-count)
-    ;; (println (format "batch(%d) of %,d plays. total=%,d" @batch-counter recs-count @play-counter))
-    (write-records-to-file recs fname)))
+    (inc-play-counter! docs-count)
+    (print ".")
+    ;; (println (format "batch(%d) of %,d plays. total=%,d" @batch-counter docs-count @play-counter))
+    (write-records-to-file docs fname)))
+
+(defn handle-batch-api [docs]
+  (let [docs (map add-bulk-fields docs)]
+    (inc-play-counter! (count docs))
+    (print ".")
+    (esb/bulk es-conn (esb/bulk-index docs))))
 
 (defn play-count []
   (-> (exec-raw "SELECT COUNT(*) AS cnt FROM plays" :results) first :cnt))
@@ -254,7 +279,8 @@
 (defn run-parallel-worker [{:keys [wid start-id stop-id size]}]
   (println (format "new worker(%d) [%,d, %,d)" wid start-id stop-id))
   (future
-    (select-in-batches (select* plays) start-id stop-id size handle-batch)
+    (Thread/sleep (* wid 2000)) ;; stagger by 2 sec
+    (select-in-batches-as-docs (select* plays) start-id stop-id size handle-batch-files)
     (println (format "worker %d complete: [%,d - %,d) total=%,d" wid start-id stop-id @play-counter))))
 
 (defn make-workers [concurrency workload-size batch-sizes]
@@ -263,17 +289,17 @@
           stop-id  (maybe-stop-id i concurrency (+ workload-size start-id))]
       {:wid i :size batch-sizes :start-id start-id :stop-id stop-id :records nil :num nil})))
 
-(defn start-workers []
+(defn start-workers [batch-size concurrency]
   (reset-counters!)
-  (let [batch-size 10000
-        concurrency 8
-        cnt (play-count)
+  (let [cnt (play-count)
         workload-size (round-to-nearest-n batch-size (int (/ cnt concurrency)))
         workers (make-workers concurrency workload-size batch-size)]
     (println (format "there are %,d plays, workload-size is %,d" cnt workload-size))
-    (doall (map deref
-                (doall (map run-parallel-worker workers))))
-    (println (format "total total %,d" @play-counter))))
+    ;; (doall (map deref
+    ;;       ))
+    (doall (map run-parallel-worker workers))
+    ;; (println (format "total total %,d" @play-counter))
+    ))
 
 (defn -main [& args]
   (println "this would be main"))
