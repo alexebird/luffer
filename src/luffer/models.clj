@@ -4,13 +4,7 @@
             [korma.core :refer [select]]
             [korma.db :refer [defdb postgres]]))
 
-(defdb db (postgres {:db "pts_dev"
-                     :user "ptsuser"
-                     ;:password "kormapass"
-                     ;; optional keys
-                     ;:delimiters ""
-                     }))
-
+(defdb db (postgres {:db (System/getenv "PG_DATABASE") :user (System/getenv "PG_USER")}))
 
 (declare plays users tracks shows tours venues api_clients)
 
