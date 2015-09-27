@@ -4,7 +4,10 @@
             [korma.core :refer [select]]
             [korma.db :refer [defdb postgres]]))
 
-(defdb db (postgres {:db (System/getenv "PG_DATABASE") :user (System/getenv "PG_USER")}))
+(defdb db (postgres {:db (System/getenv "PG_DATABASE")
+                     :host (or (System/getenv "PG_PORT_5432_TCP_ADDR") (System/getenv "PG_HOST"))
+                     :port (or (System/getenv "PG_PORT_5432_TCP_PORT") (System/getenv "PG_PORT") 5432)
+                     :user (System/getenv "PG_USER")}))
 
 (declare plays users tracks shows tours venues api_clients)
 
