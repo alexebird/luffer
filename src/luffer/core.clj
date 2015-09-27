@@ -109,11 +109,7 @@
         plays-per-worker (round-to-nearest-n batch-size (int (/ cnt concurrency)))
         workers       (make-workers concurrency plays-per-worker batch-size)]
     (println (format "there are %,d plays, plays-per-worker is %,d" cnt plays-per-worker))
-    ;#spy/d workers
-    ;; (doall (map deref
-    ;;       ))
-    ;(doall (map run-parallel-worker workers))
-    ;; (println (format "total total %,d" @play-counter))
+    (doall (map run-parallel-worker workers))
     ))
 
 (defn -main [& args]
