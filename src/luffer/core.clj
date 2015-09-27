@@ -116,5 +116,5 @@
   (let [batch-size  (parse-int (nth args 0))
         concurrency (parse-int (nth args 1))]
     (println (format "starting workers batch-size=%,d concurrency=%d" batch-size concurrency))
-    ;(start-workers batch-size concurrency)
+    (start-workers batch-size concurrency)
     ))
