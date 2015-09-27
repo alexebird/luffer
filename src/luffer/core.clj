@@ -114,7 +114,9 @@
 
 (defn -main [& args]
   (let [batch-size  (parse-int (nth args 0))
-        concurrency (parse-int (nth args 1))]
+        concurrency (parse-int (nth args 1))
+        out-dir     ((nth args 2))]
+    (.mkdirs (java.io.File. out-dir))
     (println (format "starting workers batch-size=%,d concurrency=%d" batch-size concurrency))
     (start-workers batch-size concurrency)
     ))
