@@ -7,6 +7,7 @@
                  [postgresql "9.3-1102.jdbc41"]
                  [cheshire "5.5.0"]
                  [clj-http "2.0.0"]
+                 [org.clojure/tools.cli "0.3.3"]
                  [clojurewerkz/elastisch "2.1.0"]]
   :main ^:skip-aot luffer.core
   :target-path "target/%s"

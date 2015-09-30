@@ -1,15 +1,26 @@
 (ns luffer.core
-  (:gen-class)
   (:require [clojure.string :as str]
             [cheshire.core :as json]
             [clj-http.client :as http]
             ;[clojure.tools.trace]
+            [clojure.tools.cli :refer  [parse-opts]]
             [clojure.pprint]
             [clojurewerkz.elastisch.rest :as es]
             [clojurewerkz.elastisch.rest.bulk :as esbulk]
             [clojurewerkz.elastisch.rest.admin :as esadmin])
   (:use [luffer.models :only [plays join-play-with-models]]
-        [luffer.util]))
+        [luffer.util])
+  (:gen-class))
+
+
+
+
+;;              .__               __
+;; _____________|__|__  _______ _/  |_  ____
+;; \____ \_  __ \  \  \/ /\__  \\   __\/ __ \
+;; |  |_> >  | \/  |\   /  / __ \|  | \  ___/
+;; |   __/|__|  |__| \_/  (____  /__|  \___  >
+;; |__|                        \/          \/
 
 (def ^:private play-counter  (atom 0))
 (def ^:private batch-counter (atom 1))
@@ -102,6 +113,16 @@
     (let [start-id (* i plays-per-worker)
           stop-id  (maybe-stop-id i concurrency (+ plays-per-worker start-id))]
       {:wid i :size batch-size :start-id start-id :stop-id stop-id :records nil :num nil})))
+
+
+
+
+;;            ___.   .__  .__
+;; ______  __ _\_ |__ |  | |__| ____
+;; \____ \|  |  \ __ \|  | |  |/ ___\
+;; |  |_> >  |  / \_\ \  |_|  \  \___
+;; |   __/|____/|___  /____/__|\___  >
+;; |__|             \/             \/
 
 (defn start-workers [batch-size concurrency]
   (reset-counters!)
