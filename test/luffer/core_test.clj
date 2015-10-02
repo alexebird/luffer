@@ -2,6 +2,6 @@
   (:require [clojure.test :refer :all]
             [luffer.core :refer :all]))
 
-(deftest a-test
-  (testing "FIXME, I fail."
+(deftest cli-options-parsing
+  (testing "Do the CLI options get parsed right?"
     (is (= 0 1))))
