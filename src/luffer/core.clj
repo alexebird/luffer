@@ -4,16 +4,20 @@
             [clj-http.client :as http]
             [spyscope.core]
             ;[clojure.tools.trace]
-            [clojure.tools.cli :refer  [parse-opts]]
+            [clojure.tools.cli :refer [parse-opts]]
             [clojure.pprint]
+            [taoensso.carmine :as car :refer [wcar]]
             [clojurewerkz.elastisch.rest :as es]
             [clojurewerkz.elastisch.rest.bulk :as esbulk]
             [clojurewerkz.elastisch.rest.admin :as esadmin])
   (:use [luffer.models :only [plays join-play-with-models]]
-        [luffer.util])
+        ;[luffer.util   :only [parse-int]]
+        )
   (:gen-class))
 
 
+(def server1-conn {:pool {<opts>} :spec {<opts>}}) ; See `wcar` docstring for opts
+(defmacro wcar* [& body] `(car/wcar server1-conn ~@body))`)
 
 
 ;;              .__               __
@@ -160,15 +164,15 @@
 ;; _  ____// /_/ /_  /_/ /  / _  / / /__
 ;; /_/     \__,_/ /_.___//_/  /_/  \___/
 
-
 (defn export-concurrently [{:keys [start-id stop-id concurrency batch-size out-dir] :as options}]
   (reset-counters!)
   (.mkdirs (java.io.File. out-dir))
-  (println (format "out-dir=%s" out-dir))
-  (println (format "starting exporters batch-size=%,d concurrency=%d" batch-size concurrency))
+  (println (format "starting exporters start-id=%,d stop-id=%,d batch-size=%,d concurrency=%d out-dir=%s"
+                   start-id stop-id batch-size concurrency out-dir))
 
   (let [exporters (create-exporters start-id stop-id concurrency batch-size)]
-    (doall (map-indexed #(export-plays %1 %2 batch-size) exporters))
+    ;(doall (map-indexed #(export-plays %1 %2 batch-size) exporters))
+    #spy/d exporters
     ))
 
 
@@ -242,7 +246,7 @@
       (:help options) (exit 0 (usage summary))
       (not= (count arguments) 0) (exit 1 (usage summary))
       errors (exit 1 (error-msg errors)))
-    (export-concurrently options)
+    (export-concurrently (:options options))
     ;; Execute program with options
     ;(case (first arguments)
       ;"start" (server/start! options)

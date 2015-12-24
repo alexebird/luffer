@@ -10,7 +10,8 @@
                  [clj-http "2.0.0"]
                  [spyscope "0.1.5"]
                  [org.clojure/tools.cli "0.3.3"]
-                 [clojurewerkz/elastisch "2.1.0"]]
+                 [clojurewerkz/elastisch "2.1.0"]
+                 [com.taoensso/carmine "2.12.1"]]
   :main ^:skip-aot luffer.core
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}})
