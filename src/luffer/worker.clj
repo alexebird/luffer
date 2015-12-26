@@ -4,8 +4,9 @@
             [clj-http.client :as http]
             [spyscope.core]
             ;[clojure.tools.trace]
-            [clojure.tools.cli :refer [parse-opts]]
+            ;[clojure.tools.cli :refer [parse-opts]]
             [clojure.pprint]
+            [taoensso.carmine :as car :refer [wcar]]
             [clojurewerkz.elastisch.rest :as es]
             [clojurewerkz.elastisch.rest.bulk :as esbulk]
             [clojurewerkz.elastisch.rest.admin :as esadmin])
@@ -13,6 +14,27 @@
         ;[luffer.util   :only [parse-int]]
         )
   (:gen-class))
+
+
+(def ^:private redis-conn {:pool {} :spec {:uri (System/getenv "REDIS_URL")}})
+(defmacro wcar* [& body] `(car/wcar redis-conn ~@body))
+
+(def ^:private plays-queue "pts-plays-queue")
+
+
+;(defn- queue-exists? []
+  ;(= 1 (wcar* (car/exists plays-queue))))
+
+(defn worker []
+  (let [work (wcar* (car/rpop plays-queue))])
+  (println work)
+  (if work
+    (Thread/sleep 1000)))
+
+(defn consume-jobs [work-fn]
+  (loop []
+    (work-fn)
+    (recur)))
 
 
 
