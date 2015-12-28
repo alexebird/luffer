@@ -3,15 +3,8 @@
             [cheshire.core :as json]
             [clj-http.client :as http]
             [spyscope.core]
-            ;[clojure.tools.trace]
-            [clojure.tools.cli :refer [parse-opts]]
-            [clojure.pprint]
-            [clojurewerkz.elastisch.rest :as es]
-            [clojurewerkz.elastisch.rest.bulk :as esbulk]
-            [clojurewerkz.elastisch.rest.admin :as esadmin])
-  (:use [luffer.models :only [plays join-play-with-models]]
-        ;[luffer.util   :only [parse-int]]
-        )
+            [clojure.pprint])
+  (:use [luffer.cli :only [handle-args]])
   (:gen-class))
 
 
@@ -171,82 +164,5 @@
     #spy/d exporters
     ))
 
-
-;;        .__  .__
-;;   ____ |  | |__|
-;; _/ ___\|  | |  |
-;; \  \___|  |_|  |
-;;  \___  >____/__|
-;;      \/
-
-(def ^:private cli-options
-  [;; First three strings describe a short-option, long-option with optional
-   ;; example argument description, and a description. All three are optional
-   ;; and positional.
-   ["-b" "--batch-size BATCH_SIZE" "Number passed to LIMIT in successive Play SELECTs"
-    :default 1000
-    :parse-fn #(Integer/parseInt %)
-    :validate [#(<= 1 % 100000) "Must be in [1,100k]"]]
-   ["-s" "--start-id START_ID" "Play id exporting should start from, inclusive"
-    :default 0
-    :parse-fn #(Integer/parseInt %)
-    :validate [#(<= 0 %) "Must be in [0,]"]]
-   ["-f" "--stop-id STOP_ID" "Play id exporting should stop at, inclusive"
-    :default 0
-    :parse-fn #(Integer/parseInt %)
-    :validate [#(<= 0 %) "Must be in [0,]"]]
-   ["-o" "--out-dir OUT_DIR" "Directory to output exported batch files. Will be created with mkdir -p."
-    :validate [#(not (empty? %)) "Must exist"]]
-   ["-c" "--concurrency CONCURRENCY" "Number of exporters to run concurrently"
-    :default 1
-    ;; Specify a string to output in the default column in the options summary
-    ;; if the default value's string representation is very ugly
-    ;:default-desc "localhost"
-    :parse-fn #(Integer/parseInt %)]
-   ;; If no required argument description is given, the option is assumed to
-   ;; be a boolean option defaulting to nil
-   ;[nil "--detach" "Detach from controlling process"]
-   ["-v" nil "Verbosity level; may be specified multiple times to increase value"
-    ;; If no long-option is specified, an option :id must be given
-    :id :verbosity
-    :default 0
-    ;; Use assoc-fn to create non-idempotent options
-    :assoc-fn (fn [m k _] (update-in m [k] inc))]
-   ["-h" "--help"]])
-
-(defn- usage [options-summary]
-  (->> ["This is my program. There are many like it, but this one is mine."
-        ""
-        "Usage: luffer [options] action"
-        ""
-        "Options:"
-        options-summary
-        ""
-        "Actions:"
-        ""
-        "Please refer to the manual page for more information."]
-       (str/join \newline)))
-
-(defn- error-msg [errors]
-  (str "The following errors occurred while parsing your command:\n\n"
-       (str/join \newline errors)))
-
-(defn- exit [status msg]
-  (println msg)
-  (System/exit status))
-
 (defn -main [& args]
-  (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)]
-    ;; Handle help and error conditions
-    (cond
-      (:help options) (exit 0 (usage summary))
-      (not= (count arguments) 0) (exit 1 (usage summary))
-      errors (exit 1 (error-msg errors)))
-    (export-concurrently (:options options))
-    ;; Execute program with options
-    ;(case (first arguments)
-      ;"start" (server/start! options)
-      ;"stop" (server/stop! options)
-      ;"status" (server/status! options)
-      ;(exit 1 (usage summary)))
-    ))
+  (handle-args args))

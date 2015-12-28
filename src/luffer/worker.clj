@@ -31,13 +31,8 @@
 
 (def ^:private plays-queue "pts-plays-queue")
 
-;(defn- add-bulk-fields
-  ;"add _index and _type fields"
-  ;[play]
-  ;(merge play {:_index es-index :_type "play"}))
-
 (defn- handle-batch-api [index docs]
-  (let [docs (map add-bulk-fields docs)]
+  (let []
     (print ".")
     (esbulk/bulk-with-index-and-type es-conn index "play" (esbulk/bulk-index docs))))
 
@@ -59,7 +54,17 @@
 (defn- get-work []
   (parse-work (wcar* (car/rpop plays-queue))))
 
-(defn consume-work [callback]
+(defn- documents-for-raw-work [work]
+  (select-plays (build-query work)))
+
+
+;; ________       ______ __________
+;; ___  __ \___  ____  /____  /__(_)______
+;; __  /_/ /  / / /_  __ \_  /__  /_  ___/
+;; _  ____// /_/ /_  /_/ /  / _  / / /__
+;; /_/     \__,_/ /_.___//_/  /_/  \___/
+
+(defn pop-raw-work [callback]
   (loop []
     (if-let [work (get-work)]
       (do
@@ -69,37 +74,11 @@
     (Thread/sleep 250)
     (recur)))
 
-;(defn- write-bulk-record
-  ;"write bulk action line and source document line"
-  ;[stream rec]
-  ;(do (.write stream "{\"index\":{}}\n")
-      ;(json/encode-stream rec stream)
-      ;(.write stream "\n")))
-
-;(defn- write-records-to-file [recs fname]
-  ;(with-open [stream (clojure.java.io/writer fname)]
-    ;(doseq [r recs] (write-bulk-record stream r))))
-
-;(defn- handle-batch-files [docs]
-  ;(let [docs-count (count docs)
-        ;fname (format "./tmp/batch-%d.json" (swap! batch-counter inc))]
-    ;(inc-play-counter! docs-count)
-    ;(print ".")
-    ;;(println (format "batch(%d) of %,d plays. total=%,d" @batch-counter docs-count @play-counter))
-    ;(write-records-to-file docs fname)))
-
-
-;; ________       ______ __________
-;; ___  __ \___  ____  /____  /__(_)______
-;; __  /_/ /  / / /_  __ \_  /__  /_  ___/
-;; _  ____// /_/ /_  /_/ /  / _  / / /__
-;; /_/     \__,_/ /_.___//_/  /_/  \___/
-
 (defn export-in-parallel [{:keys [concurrency index]}]
   (println (format "starting workers concurrency=%d" concurrency))
   (dotimes [_ concurrency]
     (future
-      (consume-work #(count (select-plays (build-query %)))))))
+      (pop-raw-work #(documents-for-raw-work %)))))
 
 
 ;;        .__  .__
@@ -163,3 +142,15 @@
       (not= (count arguments) 0) (exit 1 (usage summary))
       errors                     (exit 1 (error-msg errors)))
     (export-in-parallel (:options options))))
+
+;(defn- write-records-to-file [recs fname]
+  ;(with-open [stream (clojure.java.io/writer fname)]
+    ;(doseq [r recs] (write-bulk-record stream r))))
+
+;(defn- handle-batch-files [docs]
+  ;(let [docs-count (count docs)
+        ;fname (format "./tmp/batch-%d.json" (swap! batch-counter inc))]
+    ;(inc-play-counter! docs-count)
+    ;(print ".")
+    ;;(println (format "batch(%d) of %,d plays. total=%,d" @batch-counter docs-count @play-counter))
+    ;(write-records-to-file docs fname)))

@@ -21,7 +21,6 @@
 ;t.string   "ip_address"
 ;t.datetime "created_at"
 ;t.datetime "updated_at"
-
 (korma.core/defentity plays
   (korma.core/entity-fields :id :user_id :track_id :api_client_id :source :created_at)
   (korma.core/belongs-to users {:fk :user_id})
@@ -33,7 +32,6 @@
 ;t.string   "username"
 ;t.string   "email"
 ;t.datetime "created_at"
-
 (korma.core/defentity users
   (korma.core/entity-fields :id :username :email :created_at)
   (korma.core/has-many plays))
@@ -55,7 +53,6 @@
 ;t.string   "unique_slug"
 ;t.string   "source"
 ;t.datetime "created_at"
-
 (korma.core/defentity tracks
   (korma.core/entity-fields :id :show_id :remote_id :title :slug :position :position_in_set :position_in_show :duration :set :set_name :set_index :mp3 :unique_slug :source :created_at)
   (korma.core/has-many plays)
@@ -70,7 +67,6 @@
 ;t.boolean  "sbd"
 ;t.boolean  "remastered"
 ;t.string   "source",     :null => false
-
 (korma.core/defentity shows
   (korma.core/entity-fields :id :tour_id :venue_id :remote_id :date :duration :sbd :remastered :source)
   (korma.core/has-many tracks)
@@ -86,7 +82,6 @@
 ;t.string   "starts_on"
 ;t.string   "ends_on"
 ;t.string   "source",      :null => false
-
 (korma.core/defentity tours
   (korma.core/entity-fields :id :remote_id :name :shows_count :slug :starts_on :ends_on :source)
   (korma.core/has-many shows))
@@ -102,14 +97,12 @@
 ;t.string   "location",    :null => false
 ;t.string   "slug",        :null => false
 ;t.string   "source",      :null => false
-
 (korma.core/defentity venues
   (korma.core/entity-fields :id :remote_id :name :past_names :latitude :longitude :shows_count :location :slug :source)
   (korma.core/has-many shows))
 
 
 ;; api_client model
-
 (korma.core/defentity api_clients
   (korma.core/entity-fields :id :name :description)
   (korma.core/has-many plays)
@@ -127,14 +120,12 @@
           coll))
 
 ;; get all static data
-(def tours-by-id  (id-doc-map (select tours)))
-(def venues-by-id (id-doc-map (select venues)))
-(def shows-by-id  (id-doc-map (select shows)))
-(def tracks-by-id (id-doc-map (select tracks)))
+(def tours-by-id       (id-doc-map (select tours)))
+(def venues-by-id      (id-doc-map (select venues)))
+(def shows-by-id       (id-doc-map (select shows)))
+(def tracks-by-id      (id-doc-map (select tracks)))
 (def api-clients-by-id (id-doc-map (select api_clients)))
-(def users-by-id (id-doc-map (select users)))
-
-;; idea: use transform to make column names unique
+(def users-by-id       (id-doc-map (select users)))
 
 (defn join-by-id
   "Join in-memory models. Iterate the primary collection and set a key for each matching lookup-collection model."
