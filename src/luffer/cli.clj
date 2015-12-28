@@ -6,10 +6,10 @@
 ;;      \/
 
 (ns luffer.cli
+  (:gen-class)
   (:require [clojure.string :as str]
             [clojure.tools.cli :refer [parse-opts]]
-            [clojure.pprint])
-  (:gen-class))
+            [clojure.pprint]))
 
 (def ^:private cli-options
   [
@@ -57,11 +57,10 @@
   (println msg)
   (System/exit status))
 
-(defn handle-args []
+(defn handle-args [args callback]
   (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)]
-    ;; Handle help and error conditions
     (cond
       (:help options)            (exit 0 (usage summary))
       (not= (count arguments) 0) (exit 1 (usage summary))
-      errors                     (exit 1 (error-msg errors)))
-    (export-in-parallel (:options options))))
+      errors                     (exit 1 (error-msg errors))
+      :else                      (apply callback (:options options)))))

@@ -1,8 +1,10 @@
 (ns luffer.models
   (:gen-class)
-  (:require [clojure.string :as str]
-            [korma.core :refer [select]]
-            [korma.db :refer [defdb postgres]]))
+  (:require [clojure.string  :as str]
+            [korma.core      :refer [select]]
+            [korma.db        :refer [defdb postgres]]
+            [clj-time.core   :as time]
+            [clj-time.format :as timefmt]))
 
 (defdb db (postgres {:db (System/getenv "PG_DATABASE")
                      :host (or (System/getenv "PG_PORT_5432_TCP_ADDR") (System/getenv "PG_HOST"))

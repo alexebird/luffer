@@ -10,3 +10,4 @@ pom.xml.asc
 tmp
 .#*
 .env
+*env.sh
