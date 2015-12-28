@@ -1,10 +1,22 @@
 {
-   "template": "plays.*",
+   "template": "plays.exp.*",
    "settings": {
-      "number_of_shards"
+      "index": {
+         "number_of_shards": 1,
+         "number_of_replicas": 0
+      },
+      "analysis": {
+         "analyzer": {
+            "lowercase_keyword_analyzer": {
+               "type": "custom",
+               "tokenizer": "keyword",
+               "filter": ["lowercase"]
+            }
+         }
+      }
    },
    "aliases": {
-      "plays": {}
+      "plays.exp": {}
    },
    "mappings": {
       "play": {

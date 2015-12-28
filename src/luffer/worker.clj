@@ -38,6 +38,13 @@
       (korma.core/where {:id [<  stop-id]})
       (korma.core/where {:id [>= start-id]})))
 
+(defn- get-documents-for-work [work]
+  (select-plays (build-query work)))
+
+(defn- bulk-index-plays [index docs]
+  (if-not (empty? docs)
+    (esbulk/bulk-with-index-and-type es-conn index "play" (esbulk/bulk-index docs))))
+
 (defn- parse-work [raw]
   (if raw
     (map #(Integer/parseInt (re-find #"\d+" %)) (str/split raw #"-"))
@@ -54,20 +61,15 @@
 (defn- worker-loop [callback]
   (doall (repeatedly #(do-work callback))))
 
+
 ;; ________       ______ __________
 ;; ___  __ \___  ____  /____  /__(_)______
 ;; __  /_/ /  / / /_  __ \_  /__  /_  ___/
 ;; _  ____// /_/ /_  /_/ /  / _  / / /__
 ;; /_/     \__,_/ /_.___//_/  /_/  \___/
 
-(defn get-documents [work]
-  (select-plays (build-query work)))
-
-(defn bulk-index-plays [index docs]
-  (esbulk/bulk-with-index-and-type es-conn index "play" (esbulk/bulk-index docs)))
-
 (defn run-workers [concurrency index]
   (println (format "starting workers concurrency=%d" concurrency))
   (dotimes [_ concurrency]
     (future
-      (worker-loop #(bulk-index-plays index (get-documents %))))))
+      (worker-loop #(bulk-index-plays index (get-documents-for-work %))))))
