@@ -1,7 +1,6 @@
 (ns luffer.worker
   (:gen-class)
   (:require [clojure.string :as str]
-            [cheshire.core :as json]
             [clj-http.client :as http]
             [spyscope.core]
             ;[clojure.tools.trace]
@@ -11,7 +10,8 @@
             [clojurewerkz.elastisch.rest :as es]
             [clojurewerkz.elastisch.rest.bulk :as esbulk]
             [clojurewerkz.elastisch.rest.admin :as esadmin])
-  (:use [luffer.models :only [plays join-play-with-models]]))
+  (:use [luffer.models :only [plays join-play-with-models]]
+        [luffer.util :only [parse-int]]))
 
 ;; Elasticsearch
 (def ^:private es-conn (es/connect (System/getenv "ES_HOST")))
@@ -19,6 +19,7 @@
 ;; Redis
 (def ^:private redis-conn {:pool {} :spec {:uri (System/getenv "REDIS_URL")}})
 (defmacro wcar* [& body] `(car/wcar redis-conn ~@body))
+(def ^:private futures (atom []))
 
 
 ;;              .__               __
@@ -47,19 +48,26 @@
 
 (defn- parse-work [raw]
   (if raw
-    (map #(Integer/parseInt (re-find #"\d+" %)) (str/split raw #"-"))
+    (map parse-int (str/split raw #"-"))
     nil))
 
 (defn- dequeue-work! []
   (parse-work (wcar* (car/rpop plays-queue))))
 
-(defn- do-work [callback]
-  (if-let [work (dequeue-work!)]
-    (callback work)
-    (Thread/sleep 250)))
+(defn- print-work [worker-id [start-id stop-id :as work]]
+  (if work
+    (println (format "worker %d exporting [%d,%d)" worker-id start-id stop-id))
+    (println (format "worker %d idle" worker-id))))
 
-(defn- worker-loop [callback]
-  (doall (repeatedly #(do-work callback))))
+(defn- do-work [i callback]
+  (let [work (dequeue-work!)]
+    (print-work i work)
+    (if work
+      (callback work)
+      (Thread/sleep 250))))
+
+(defn- worker-loop [i callback]
+  (doall (repeatedly #(do-work i callback))))
 
 
 ;; ________       ______ __________
@@ -68,8 +76,13 @@
 ;; _  ____// /_/ /_  /_/ /  / _  / / /__
 ;; /_/     \__,_/ /_.___//_/  /_/  \___/
 
+(defn size-up-bulk-payload [size]
+  (format "%.2fM" (/ (count (json/encode (esbulk/bulk-index (get-documents-for-work [1 size])))) (* 1024.0 1024.0))))
+
 (defn run-workers [concurrency index]
   (println (format "starting workers concurrency=%d" concurrency))
-  (dotimes [_ concurrency]
-    (future
-      (worker-loop #(bulk-index-plays index (get-documents-for-work %))))))
+  (reset! futures
+    (doall
+      (map
+        (fn [i] (future (worker-loop i #(bulk-index-plays index (get-documents-for-work %)))))
+        (range concurrency)))))
