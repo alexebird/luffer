@@ -44,8 +44,9 @@ enable_cluster_settings_for_fast_index() {
 HERE
 }
 
-on_source() {
+main() {
   check_required_env
+  eval "${1}"
 }
 
-on_source
+main "${1}"
