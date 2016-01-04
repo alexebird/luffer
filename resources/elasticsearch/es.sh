@@ -16,6 +16,7 @@ put_cluster_settings() {
 {
     "persistent" : {
         "indices.store.throttle.max_bytes_per_sec" : "200mb",
+	"indices.store.throttle.type" : "merge",
 	"bootp.mlockall": true
     }
 }
