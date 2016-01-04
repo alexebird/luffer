@@ -2,6 +2,7 @@
   (:gen-class)
   (:require [clojure.string :as str]
             [clj-http.client :as http]
+            [cheshire.core :as json]
             [spyscope.core]
             ;[clojure.tools.trace]
             [clojure.tools.cli :refer [parse-opts]]
