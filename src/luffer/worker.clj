@@ -17,7 +17,7 @@
 (def ^:private es-conn (es/connect (System/getenv "ES_HOST")))
 (def ^:private plays-queue "pts-plays-queue")
 ;; Redis
-(def ^:private redis-conn {:pool {} :spec {:uri (System/getenv "REDIS_URL")}})
+(def ^:private redis-conn {:pool {} :spec {:uri (System/getenv "REDIS_URL_EXPORTER")}})
 (defmacro wcar* [& body] `(car/wcar redis-conn ~@body))
 (def ^:private futures (atom []))
 

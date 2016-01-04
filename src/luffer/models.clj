@@ -6,6 +6,7 @@
             [clj-time.core   :as time]
             [clj-time.format :as timefmt]))
 
+;; :connection-uri can be used as well
 (defdb db (postgres {:db (System/getenv "PG_DATABASE")
                      :host (or (System/getenv "PG_PORT_5432_TCP_ADDR") (System/getenv "PG_HOST"))
                      :port (or (System/getenv "PG_PORT_5432_TCP_PORT") (System/getenv "PG_PORT") 5432)
