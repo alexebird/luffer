@@ -10,6 +10,7 @@
 (defdb db (postgres {:db (System/getenv "PG_DATABASE")
                      :host (or (System/getenv "PG_PORT_5432_TCP_ADDR") (System/getenv "PG_HOST"))
                      :port (or (System/getenv "PG_PORT_5432_TCP_PORT") (System/getenv "PG_PORT") 5432)
+                     :password (System/getenv "PG_PASSWORD")
                      :user (System/getenv "PG_USER")}))
 
 (declare plays users tracks shows tours venues api_clients)
