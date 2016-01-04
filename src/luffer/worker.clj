@@ -57,8 +57,7 @@
 
 (defn- print-work [worker-id [start-id stop-id :as work]]
   (if work
-    (println (format "worker %d exporting [%d,%d)" worker-id start-id stop-id))
-    (println (format "worker %d idle" worker-id))))
+    (println (format "worker %d exporting [%d,%d)" worker-id start-id stop-id))))
 
 (defn- do-work [i callback]
   (let [work (dequeue-work!)]
