@@ -20,7 +20,6 @@
    },
    "mappings": {
       "play": {
-         "dynamic": "strict",
          "properties": {
             "api_client": {
                "properties": {
