@@ -12,7 +12,7 @@
             [clojurewerkz.elastisch.rest.bulk :as esbulk]
             [clojurewerkz.elastisch.rest.admin :as esadmin])
   (:use [luffer.models :only [plays join-play-with-models]]
-        [luffer.util :only [parse-int]]))
+        [luffer.util :only [parse-int secs]]))
 
 ;; Elasticsearch
 (def ^:private es-conn (es/connect (System/getenv "ES_HOST")))
