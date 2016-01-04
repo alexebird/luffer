@@ -63,4 +63,4 @@
       (:help options)            (exit 0 (usage summary))
       (not= (count arguments) 0) (exit 1 (usage summary))
       errors                     (exit 1 (error-msg errors))
-      :else                      (apply callback (:options options)))))
+      :else                      (callback options))))
