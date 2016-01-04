@@ -7,7 +7,7 @@ check_required_env() {
 }
 
 put_plays_template() {
-  local templ='plays.exp'
+  local templ='plays'
   curl "${ES_HOST}/_template/${templ}" -XPUT -d@"templates/${templ}.json" | jq '.'
 }
 

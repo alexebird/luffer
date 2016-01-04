@@ -1,5 +1,5 @@
 {
-   "template": "plays.exp.*",
+   "template": "plays.*",
    "settings": {
       "index": {
          "number_of_shards": 1,
@@ -16,7 +16,7 @@
       }
    },
    "aliases": {
-      "plays.exp": {}
+      "plays": {}
    },
    "mappings": {
       "play": {
