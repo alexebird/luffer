@@ -64,8 +64,10 @@
   (let [work (dequeue-work!)]
     (print-work i work)
     (if work
-      (callback work)
-      (Thread/sleep 250))))
+      (let [timing (secs (callback work))]
+        (wcar* (car/incrbyfloat "export-timing" timing)))
+      (Thread/sleep 250)))
+  nil)
 
 (defn- worker-loop [i callback]
   (doall (repeatedly #(do-work i callback))))
