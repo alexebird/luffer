@@ -57,13 +57,14 @@
 
 (defn- print-work [worker-id [start-id stop-id :as work]]
   (if work
-    (println (format "worker %d exporting [%d,%d)" worker-id start-id stop-id))))
+    (println (format "worker %d exporting [%,d - %,d)" worker-id start-id stop-id))))
 
 (defn- do-work [i callback]
   (let [work (dequeue-work!)]
     (print-work i work)
     (if work
       (let [timing (secs (callback work))]
+        (wcar* (car/incr "export-count"))
         (wcar* (car/incrbyfloat "export-timing" timing)))
       (Thread/sleep 250)))
   nil)
