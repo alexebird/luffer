@@ -3,8 +3,8 @@
 set -e
 
 check_required_env() {
-  if [ -z "${ES_HOST}" ]; then
-	echo 'must export ES_HOST'
+  if [ -z "${ES_URL}" ]; then
+	echo 'must export ES_URL'
 	exit 1
   fi
 
@@ -16,11 +16,11 @@ check_required_env() {
 
 put_plays_template() {
   local templ='plays'
-  curl "${ES_HOST}/_template/${templ}" -XPUT -d@"templates/${templ}.json" | jq '.'
+  curl "${ES_URL}/_template/${templ}" -XPUT -d@"templates/${templ}.json" | jq '.'
 }
 
 put_cluster_settings() {
-  curl "${ES_HOST}/_cluster/settings" -XPUT -d@- <<-HERE | jq '.'
+  curl "${ES_URL}/_cluster/settings" -XPUT -d@- <<-HERE | jq '.'
 {
   "persistent": {
     "indices.store.throttle.max_bytes_per_sec": "200mb",
@@ -34,7 +34,7 @@ HERE
 tail_ids()
 {
   local idx_name="${1:?must pass index}"
-  curl -s "${ES_HOST}/${idx_name}/play/_search" -XGET -d@- <<-HERE | jq '.'
+  curl -s "${ES_URL}/${idx_name}/play/_search" -XGET -d@- <<-HERE | jq '.'
 {
   "_source": false,
   "size": 3,
@@ -45,7 +45,7 @@ HERE
 }
 
 disable_cluster_settings_for_fast_index() {
-  curl "${ES_HOST}/_cluster/settings" -XPUT -d@- <<-HERE | jq '.'
+  curl "${ES_URL}/_cluster/settings" -XPUT -d@- <<-HERE | jq '.'
 {
   "transient": {
     "indices.store.throttle.type": "merge"
@@ -55,7 +55,7 @@ HERE
 }
 
 enable_cluster_settings_for_fast_index() {
-  curl "${ES_HOST}/_cluster/settings" -XPUT -d@- <<-HERE | jq '.'
+  curl "${ES_URL}/_cluster/settings" -XPUT -d@- <<-HERE | jq '.'
 {
   "transient": {
     "indices.store.throttle.type": "none"
@@ -68,7 +68,7 @@ rm_alias()
 {
   local idx_name="${1:?must pass index}"
   local plays_alias_name='plays'
-  curl -s "${ES_HOST}/_aliases" -XPOST -d@- <<-HERE | jq '.'
+  curl -s "${ES_URL}/_aliases" -XPOST -d@- <<-HERE | jq '.'
 {
   "actions": [
     { "remove": { "index": "${idx_name}", "alias" : "${plays_alias_name}" } }
@@ -83,7 +83,7 @@ add_alias()
 {
   local idx_name="${1:?must pass index}"
   local plays_alias_name='plays'
-  curl -s "${ES_HOST}/_aliases" -XPOST -d@- <<-HERE | jq '.'
+  curl -s "${ES_URL}/_aliases" -XPOST -d@- <<-HERE | jq '.'
 {
   "actions": [
     { "add": { "index": "${idx_name}", "alias" : "${plays_alias_name}" } }
@@ -97,7 +97,7 @@ HERE
 mk_index()
 {
   local idx_name="${1:?must pass index}"
-  curl -s "${ES_HOST}/${idx_name}" -XPUT | jq '.'
+  curl -s "${ES_URL}/${idx_name}" -XPUT | jq '.'
   indices
 }
 
@@ -105,23 +105,23 @@ rm_index()
 {
   local idx_name="${1:?must pass index}"
   [[ "$2" == 'xXx' ]] || { echo must pass magic ; exit 1 ; }
-  curl -s "${ES_HOST}/${idx_name}" -XDELETE | jq '.'
+  curl -s "${ES_URL}/${idx_name}" -XDELETE | jq '.'
   indices
 }
 
 aliases()
 {
-  curl -s ${ES_HOST}/_cat/aliases?v
+  curl -s ${ES_URL}/_cat/aliases?v
 }
 
 health()
 {
-  curl -s ${ES_HOST}/_cat/health?v
+  curl -s ${ES_URL}/_cat/health?v
 }
 
 indices()
 {
-  curl -s ${ES_HOST}/_cat/indices?v
+  curl -s ${ES_URL}/_cat/indices?v
 }
 
 droplet_ip()
@@ -139,6 +139,19 @@ droplet_ip()
 laptop_public_ip()
 {
   curl -s icanhazip.com
+}
+
+host_ip_env()
+{
+  local hostname_prefix="${1:?pass 1:hostname_prefix}"
+
+  local private_ip="$(droplet_ip private ${hostname_prefix})"
+  private_ip="${private_ip:?couldnt get private ip}"
+  local public_ip="$(droplet_ip public ${hostname_prefix})"
+  public_ip="${public_ip:?couldnt get public ip}"
+
+  echo "export ${hostname_prefix^^}_PRIVATE_IP=${private_ip}"
+  echo "export ${hostname_prefix^^}_PUBLIC_IP=${public_ip}"
 }
 
 export_firewall_allows()
@@ -163,6 +176,14 @@ HERE
 export_firewall_deletes()
 {
   export_firewall_allows | sed -e's/\(ufw\) \(allow\)/\1 delete \2/'
+}
+
+put_exporter_env()
+{
+  cat ../env.sh | sed -e's/export/echo/' -e's/_PUBLIC_IP/_PRIVATE_IP/' | \
+    bash | base64 | \
+    ssh ubuntu@exporter-2016-01-09-707-nyc3.external.phishtrackstats.com \
+    'cat - | base64 -d > /tmp/env.sh'
 }
 
 main() {

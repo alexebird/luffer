@@ -15,10 +15,10 @@
         [luffer.util :only [parse-int secs]]))
 
 ;; Elasticsearch
-(def ^:private es-conn (es/connect (System/getenv "ES_HOST")))
+(def ^:private es-conn (es/connect (System/getenv "ES_URL")))
 (def ^:private plays-queue "pts-plays-queue")
 ;; Redis
-(def ^:private redis-conn {:pool {} :spec {:uri (System/getenv "REDIS_URL_EXPORTER")}})
+(def ^:private redis-conn {:pool {} :spec {:uri (System/getenv "REDIS_URL")}})
 (defmacro wcar* [& body] `(car/wcar redis-conn ~@body))
 (def ^:private futures (atom []))
 

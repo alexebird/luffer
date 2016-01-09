@@ -58,4 +58,8 @@ class PlaysExporter
     block_if_work_queue_size_above(0)
     delete_queue
   end
+
+  #def foo ; tot=8000000.0/15000 ; timing=@redis.get("export-timing").to_f ; count=@redis.get("export-count").to_i ; avg=timing/count ; puts format("count: %d\navg:   %.2fs\nest:   %.2fm\n\n", count, avg, ((tot-count)*avg)/60.0/20.0) ; nil ; end
+  #:foo
+  #[16] pry(main)> loop { foo ; sleep 1 }
 end
