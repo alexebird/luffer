@@ -1,5 +1,4 @@
 (ns luffer.models
-  (:gen-class)
   (:require [clojure.string  :as str]
             [korma.core      :refer [select]]
             [korma.db        :refer [defdb postgres]]

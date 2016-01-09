@@ -6,7 +6,6 @@
 ;;      \/
 
 (ns luffer.cli
-  (:gen-class)
   (:require [clojure.string :as str]
             [clojure.tools.cli :refer [parse-opts]]
             [clojure.pprint]))

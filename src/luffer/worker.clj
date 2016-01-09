@@ -1,5 +1,4 @@
 (ns luffer.worker
-  (:gen-class)
   (:require [clojure.string :as str]
             [clj-http.client :as http]
             [cheshire.core :as json]
@@ -16,7 +15,7 @@
 
 ;; Elasticsearch
 (def ^:private es-conn (es/connect (System/getenv "ES_URL")))
-(def ^:private plays-queue "pts-plays-queue")
+(def ^:private plays-queue "pts-exporter-queue")
 ;; Redis
 (def ^:private redis-conn {:pool {} :spec {:uri (System/getenv "REDIS_URL")}})
 (defmacro wcar* [& body] `(car/wcar redis-conn ~@body))

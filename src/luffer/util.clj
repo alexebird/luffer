@@ -1,5 +1,4 @@
-(ns luffer.util
-  (:gen-class))
+(ns luffer.util)
 
 (defn parse-int [s]
   (Integer. (re-find  #"\d+" s)))
