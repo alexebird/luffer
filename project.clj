@@ -13,6 +13,4 @@
                  [clojurewerkz/elastisch "2.1.0"]
                  [com.taoensso/carmine "2.12.1"]
                  [clj-time "0.11.0"]]
-  :main ^:skip-aot luffer.core
-  :target-path "target/%s"
-  :profiles {:uberjar {:aot :all}})
+  :main luffer.core)
