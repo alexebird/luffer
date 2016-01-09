@@ -12,7 +12,7 @@
                      ;:password (System/getenv "PG_PASSWORD")
                      ;:user (System/getenv "PG_USER")}))
 
-(defdb db (postgres {:connection-uri (System/getenv "PG_URL")}))
+(defdb db (postgres {:connection-uri (str "jdbc:" (System/getenv "PG_URL"))}))
 
 (declare plays users tracks shows tours venues api_clients)
 
