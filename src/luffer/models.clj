@@ -1,18 +1,16 @@
 (ns luffer.models
-  (:require [clojure.string  :as str]
+  (:require [clojure.string  :as strng]
             [korma.core      :refer [select]]
             [korma.db        :refer [defdb postgres]]
             [clj-time.core   :as time]
             [clj-time.format :as timefmt]))
 
-;; :connection-uri can be used as well
-;(defdb db (postgres {:db (System/getenv "PG_DATABASE")
-                     ;:host (or (System/getenv "PG_PORT_5432_TCP_ADDR") (System/getenv "PG_HOST"))
-                     ;:port (or (System/getenv "PG_PORT_5432_TCP_PORT") (System/getenv "PG_PORT") 5432)
-                     ;:password (System/getenv "PG_PASSWORD")
-                     ;:user (System/getenv "PG_USER")}))
+(defn- conn-map [pg-uri]
+  (let [re (re-pattern (strng/join "(.+)" ["postgresql://" ":" "@" ":" "/" ""])) ]
+    (zipmap [:user :password :host :port :db]
+            (rest (re-matches re pg-uri)))))
 
-(defdb db (postgres {:connection-uri (str "jdbc:" (System/getenv "PG_URL"))}))
+(defdb db (postgres (conn-map (System/getenv "PG_URL"))))
 
 (declare plays users tracks shows tours venues api_clients)
 
@@ -102,7 +100,7 @@
                   (join-by-id tours-by-id :tour :tour_id))
               :show :show_id
               (fn [track]
-                (assoc track :unique_slug (str/join "/" [(get-in track [:show :date])
+                (assoc track :unique_slug (strng/join "/" [(get-in track [:show :date])
                                                          (get-in track [:slug])])))))
 
 (defn track-fully-stocked [id]
