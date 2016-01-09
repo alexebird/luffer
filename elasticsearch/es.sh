@@ -1,8 +1,16 @@
 #!/bin/bash
 
+set -e
+
 check_required_env() {
   if [ -z "${ES_HOST}" ]; then
 	echo 'must export ES_HOST'
+	exit 1
+  fi
+
+  if [ -z "${DO_API_KEY}" ]; then
+    echo 'must export DO_API_KEY'
+    exit 1
   fi
 }
 
@@ -121,11 +129,6 @@ droplet_ip()
   local ip_type="${1:?pass 1:ip_type}"
   local name_prefix="${2:?pass 2:name_prefix}"
 
-  if [ -z "${DO_API_KEY}" ]; then
-    echo 'must export DO_API_KEY'
-    exit 1
-  fi
-
   curl -s -XGET -H"Content-Type: application/json" \
     -H"Authorization: Bearer ${DO_API_KEY}" \
     "https://api.digitalocean.com/v2/droplets?page=1&per_page=100" | \
@@ -142,7 +145,7 @@ export_firewall_allows()
 {
   local laptop_ip="$(laptop_public_ip)"
   laptop_ip="${laptop_ip:?couldnt get laptop public ip}"
-  local exporter_eth1="$(droplet_ip private phish)"
+  local exporter_eth1="$(droplet_ip private exporter)"
   exporter_eth1="${exporter_eth1:?couldnt get exporter_eth1}"
   local es_port=9200
   local redis_port=6379
@@ -163,7 +166,7 @@ export_firewall_deletes()
 }
 
 main() {
-  check_required_env
+  check_required_env || { exit 1; }
   eval "${@}"
 }
 
