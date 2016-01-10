@@ -6,7 +6,16 @@
             [clj-time.format :as timefmt])
   (:use [luffer.util :only [parse-int]]))
 
-(def eras
+(declare auto-join-fks)
+
+
+;;     dMMMMb  dMMMMb  dMP dMP dMP .aMMMb dMMMMMMP dMMMMMP
+;;    dMP.dMP dMP.dMP amr dMP dMP dMP"dMP   dMP   dMP
+;;   dMMMMP" dMMMMK" dMP dMP dMP dMMMMMP   dMP   dMMMP
+;;  dMP     dMP"AMF dMP  YMvAP" dMP dMP   dMP   dMP
+;; dMP     dMP dMP dMP    VP"  dMP dMP   dMP   dMMMMMP
+
+(def ^:private eras
   [[[1983 2000] "1.0"]
    [[2002 2004] "2.0"]
    [[2009 2100] "3.0"]])
@@ -26,16 +35,15 @@
 (declare plays users tracks shows tours venues api_clients)
 
 (defentity plays
-  (entity-fields :id :source :created_at :ip_address :play_event_id :api_client_id :user_id :track_id))
+  (entity-fields :id :source :created_at :ip_address :api_client_id :user_id :track_id))
 
 (defentity users
-  (entity-fields :id :username :email :created_at)
-  )
+  (entity-fields :id :username :email :created_at))
 
 (defentity tracks
-  (entity-fields :id :title :slug :position :show_id
-                 :position_in_set :position_in_show :duration :set
-                 :set_name :set_index :mp3 :unique_slug :source :created_at))
+  (entity-fields :id :title :slug :position :show_id :position_in_set
+                 :position_in_show :duration :set :set_name :set_index :mp3
+                 :unique_slug :source :created_at))
   ; :string_id => :unique_slug
   ; :set_data [
   ;   :string_id => :show.date$:set_name
@@ -58,7 +66,7 @@
   (entity-fields :id :name :description))
 
 
-(defn id-doc-map
+(defn- id-doc-map
   "map ids to entities"
   [coll]
   (into {} (map #(vector (:id %) %) coll)))
@@ -115,13 +123,11 @@
   ; :era => some kind of mapping
 
 (defn- show-for-es-mapping [show]
-  (-> show
-      show-with-derived-fields
-      show-with-tour))
+  (show-with-derived-fields show))
 
-(defonce models-cache (atom {}))
+(defonce ^:private models-cache (atom {}))
 
-(def model-selectors
+(def ^:private model-selectors
   [[:api_client_cache #(select api_clients)]
    [:user_cache       #(select users)]
    [:tour_cache       #(map tour-for-es-mapping (select tours))]
@@ -129,20 +135,12 @@
    [:show_cache       #(map show-for-es-mapping (select shows))]
    [:track_cache      #(select tracks)]])
 
-(defn send-off-model-populate [func]
+(defn- send-off-model-populate [func]
   (send-off (agent {}) (fn [_]
                          (id-doc-map (func)))))
 
-(defn await-populate-models []
+(defn- await-populate-models []
   (apply await (vals @models-cache)))
-
-(defn populate-model-cache []
-  (reset!
-    models-cache
-    (into {} (map (fn [[name func]]
-                    [name (send-off-model-populate func)])
-                  model-selectors)))
-  (await-populate-models))
 
 ;(def tracks-joined
   ;'(join-by-id
@@ -165,33 +163,68 @@
       ;(dissoc play :track_id)
       ;:track track)))
 
-(defn assoc-model
-  "Associate the model referenced by the keyword <assoc-name>_id with model."
-  [model assoc-name]
-  (let [str-assoc-name (name assoc-name)
-        assoc-model-cache-key (keyword (str str-assoc-name "_cache"))
-        assoc-model-id        (keyword (str str-assoc-name "_id"))
-        assoc-model (get @(get @models-cache assoc-model-cache-key) (get model assoc-model-id))]
-    (assoc
-      (dissoc model assoc-model-id)
-      assoc-name assoc-model)))
+(defn- model-keywords [model-fk]
+  (let [str-name (name model-fk)]
+    {:child-model-fk        model-fk
+     :child-model-name      (keyword (strng/replace str-name #"_id" ""))
+     :child-model-cache-key (keyword (strng/replace str-name #"_id" "_cache"))}))
+
+(defn- assoc-model-fk
+  "Associate the model referenced by fk with parent-model, and dissoc fk from
+  parent-model."
+  [parent-model fk]
+  (let [{:keys [child-model-cache-key
+                child-model-fk
+                child-model-name]} (model-keywords fk)]
+    (if-let [cached-models-agt (get @models-cache child-model-cache-key)]
+      (let [cached-models @cached-models-agt
+            child-model-id (get parent-model child-model-fk)
+            child-model    (auto-join-fks (get cached-models child-model-id))]
+        (assoc
+          (dissoc parent-model child-model-fk)
+          child-model-name child-model))
+      parent-model)))
 
 (defn- model-foreign-keys [model]
   (filter (fn [k]
             (re-matches #"\A:.+_id\z" (str k)))
           (keys model)))
 
-(defn join-models [model]
-  (let [fks (model-foreign-keys model)]
-    ; TODO))
 
-(defn join-play-with-models
-  "add user, api_client and track models to the play"
-  [play]
-  (-> play
-      (assoc-model :user)
-      (assoc-model :api_client)
-      (assoc-model :track)))
+;; HELPERS
 
 (defn- one-play []
   (first (select plays (order :created_at :DESC) (limit 1) (where {:id 7543482}))))
+
+(defn- one-track []
+  (first (select tracks (order :created_at :DESC) (limit 1))))
+
+(defn- one-show []
+  (first (select shows (order :created_at :DESC) (limit 1))))
+
+(defn- one-tour []
+  (first (select tours (order :created_at :DESC) (limit 1))))
+
+
+;;     dMMMMb  dMP dMP dMMMMb  dMP     dMP .aMMMb
+;;    dMP.dMP dMP dMP dMP"dMP dMP     amr dMP"VMP
+;;   dMMMMP" dMP dMP dMMMMK" dMP     dMP dMP
+;;  dMP     dMP.aMP dMP.aMF dMP     dMP dMP.aMP
+;; dMP      VMMMP" dMMMMP" dMMMMMP dMP  VMMMP"
+
+(defn populate-model-cache []
+  (reset!
+    models-cache
+    (into {} (map (fn [[name func]]
+                    [name (send-off-model-populate func)])
+                  model-selectors)))
+  (await-populate-models))
+
+(defn auto-join-fks
+  "Detect and associate all foreign keys in model."
+  [model]
+  (reduce
+    (fn [model fk]
+      (assoc-model-fk model fk))
+    model
+    (model-foreign-keys model)))
