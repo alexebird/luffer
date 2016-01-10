@@ -7,6 +7,7 @@
             [clojure.tools.cli :refer [parse-opts]]
             [clojure.pprint]
             [taoensso.carmine :as car :refer [wcar]]
+            [korma.core :refer [select* order exec where]]
             [clojurewerkz.elastisch.rest :as es]
             [clojurewerkz.elastisch.rest.bulk :as esbulk]
             [clojurewerkz.elastisch.rest.admin :as esadmin])
@@ -30,14 +31,14 @@
 ;; |__|                        \/          \/
 
 (defn- select-plays [query]
-  (let [plz (-> query korma.core/exec)]
+  (let [plz (-> query exec)]
     (map join-play-with-models plz)))
 
 (defn- build-query [[start-id stop-id]]
-  (-> (korma.core/select* plays)
-      (korma.core/order :id :ASC)
-      (korma.core/where {:id [<  stop-id]})
-      (korma.core/where {:id [>= start-id]})))
+  (-> (select* plays)
+      (order :id :ASC)
+      (where {:id [<  stop-id]})
+      (where {:id [>= start-id]})))
 
 (defn- get-documents-for-work [work]
   (select-plays (build-query work)))
