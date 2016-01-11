@@ -9,8 +9,7 @@
             [taoensso.carmine :as car :refer [wcar]]
             [korma.core :refer [select* order exec where]]
             [clojurewerkz.elastisch.rest :as es]
-            [clojurewerkz.elastisch.rest.bulk :as esbulk]
-            [clojurewerkz.elastisch.rest.admin :as esadmin])
+            [clojurewerkz.elastisch.rest.bulk :as esbulk])
   (:use [luffer.models :only [plays doc-for-elasticsearch]]
         [luffer.util :only [parse-int secs]]))
 

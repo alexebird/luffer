@@ -167,6 +167,7 @@ export_firewall_allows()
   cat <<-HERE
 ufw allow in on eth0 from ${laptop_ip} to any port ${es_port}
 ufw allow in on eth0 from ${laptop_ip} to any port ${redis_port}
+ufw allow in on eth0 from ${laptop_ip} to any port ${pg_port}
 ufw allow in on eth1 from ${exporter_eth1} to any port ${es_port}
 ufw allow in on eth1 from ${exporter_eth1} to any port ${redis_port}
 ufw allow in on eth1 from ${exporter_eth1} to any port ${pg_port}
@@ -180,10 +181,11 @@ export_firewall_deletes()
 
 put_exporter_env()
 {
-  cat ../env.sh | sed -e's/export/echo/' -e's/_PUBLIC_IP/_PRIVATE_IP/' | \
-    bash | base64 | \
-    ssh ubuntu@exporter-2016-01-09-707-nyc3.external.phishtrackstats.com \
-    'cat - | base64 -d > /tmp/env.sh'
+  cat ../env.sh | \
+    sed -e's/export/echo/' -e's/_PUBLIC_IP/_PRIVATE_IP/' | \
+    bash | \
+    base64 | \
+    ssh ubuntu@${EXPORTER_PUBLIC_IP} 'cat - | base64 -d > /tmp/env.sh'
 }
 
 main() {
