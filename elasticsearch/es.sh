@@ -94,6 +94,36 @@ HERE
   aliases
 }
 
+prev_aliases()
+{
+  curl -s "${ES_URL}/_aliases" -XPOST -d@- <<-HERE | jq '.'
+{
+  "actions": [
+    { "remove": { "index": "plays.2016-01.x2", "alias": "plays" }},
+    { "add":    { "index": "plays.1",          "alias": "plays" }},
+    { "add":    { "index": "plays.2016-01.1",  "alias": "plays" }}
+  ]
+}
+HERE
+
+  aliases
+}
+
+curr_aliases()
+{
+  curl -s "${ES_URL}/_aliases" -XPOST -d@- <<-HERE | jq '.'
+{
+  "actions": [
+    { "add":    { "index": "plays.2016-01.x2", "alias": "plays" }},
+    { "remove": { "index": "plays.1",          "alias": "plays" }},
+    { "remove": { "index": "plays.2016-01.1",  "alias": "plays" }}
+  ]
+}
+HERE
+
+  aliases
+}
+
 mk_index()
 {
   local idx_name="${1:?must pass index}"
