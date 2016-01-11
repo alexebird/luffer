@@ -11,7 +11,7 @@
             [clojurewerkz.elastisch.rest :as es]
             [clojurewerkz.elastisch.rest.bulk :as esbulk]
             [clojurewerkz.elastisch.rest.admin :as esadmin])
-  (:use [luffer.models :only [plays auto-join-fks]]
+  (:use [luffer.models :only [plays doc-for-elasticsearch]]
         [luffer.util :only [parse-int secs]]))
 
 ;; Elasticsearch
@@ -31,8 +31,8 @@
 ;; |__|                        \/          \/
 
 (defn- select-plays [query]
-  (let [plz (-> query exec)]
-    (map auto-join-fks plz)))
+  (let [play-models (-> query exec)]
+    (map doc-for-elasticsearch play-models)))
 
 (defn- build-query [[start-id stop-id]]
   (-> (select* plays)

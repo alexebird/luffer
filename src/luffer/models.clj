@@ -6,7 +6,10 @@
             [clj-time.format :as timefmt])
   (:use [luffer.util :only [parse-int]]))
 
-(declare auto-join-fks)
+
+;; DECLARATIONS
+
+(declare doc-for-elasticsearch)
 
 
 ;;     dMMMMb  dMMMMb  dMP dMP dMP .aMMMb dMMMMMMP dMMMMMP
@@ -15,24 +18,12 @@
 ;;  dMP     dMP"AMF dMP  YMvAP" dMP dMP   dMP   dMP
 ;; dMP     dMP dMP dMP    VP"  dMP dMP   dMP   dMMMMMP
 
-(def ^:private eras
-  [[[1983 2000] "1.0"]
-   [[2002 2004] "2.0"]
-   [[2009 2100] "3.0"]])
-
-(defn- get-era [year]
-  (last (filter (fn [[[low high] era :as foo]]
-                  (and (>= year low) (<= year high)))
-                eras)))
-
 (defn- conn-map [pg-uri]
   (let [re (re-pattern (strng/join "(.+)" ["postgresql://" ":" "@" ":" "/" ""])) ]
     (zipmap [:user :password :host :port :db]
             (rest (re-matches re pg-uri)))))
 
 (defdb db (postgres (conn-map (System/getenv "PG_URL"))))
-
-;(declare plays users tracks shows tours venues api_clients)
 
 (defentity plays
   (entity-fields :id :source :created_at :ip_address :api_client_id :user_id :track_id))
@@ -41,9 +32,9 @@
   (entity-fields :id :username :email :created_at))
 
 (defentity tracks
-  (entity-fields :id :title :slug :position :show_id :position_in_set
-                 :position_in_show :duration :set :set_name :set_index :mp3
-                 :unique_slug :source :created_at))
+  (entity-fields :id :show_id :title :slug :mp3 :duration :unique_slug :source :created_at
+                 :position :position_in_set :position_in_show
+                 :set :set_name :set_index))
 
 (defentity shows
   (entity-fields :id :date :duration :sbd :remastered :source :tour_id :venue_id))
@@ -57,39 +48,14 @@
 (defentity api_clients
   (entity-fields :id :name :description))
 
-(defn- id-doc-map
-  "map ids to entities"
-  [coll]
-  (into {} (map #(vector (:id %) %) coll)))
 
-(defn- venue-for-es-mapping
-  "Add venue fields required by the ES mapping."
-  [venue]
-  (let [lat (:latitude venue)
-        lon (:longitude venue)
-        venue (dissoc venue :latitude :longitude)]
-    (merge venue
-           {:string_id (:slug venue)
-            :location_point {:lat lat
-                             :lon lon}})))
 
-(defn- tour-for-es-mapping
-  "Add tour fields required by the ES mapping."
-  [tour]
-  (merge tour
-         {:string_id (:slug tour)}))
 
-(defn- show-for-es-mapping
-  "Add show fields required by the ES mapping."
-  [{:keys [date] :as show}]
-  (let [year (parse-int (re-find #"\d{4}" date))]
-    (merge show
-           {:string_id date
-            :year year
-            :era (last (get-era year))})))
+(defmulti ^:private add-es-mapping-fields
+  "Adds fields to entity which are expected by the Elasticsearch mapping."
+  (fn [entity] (:_type entity)))
 
-(defn- track-for-es-mapping
-  "Add track fields required by the ES mapping."
+(defmethod add-es-mapping-fields :track
   [{:keys [unique_slug set_name set_index set show] :as track}]
   (let [date (:date show)
         show_id (:id show)]
@@ -101,22 +67,88 @@
                        :name set
                        :full_name set_name}})))
 
+(defmethod add-es-mapping-fields :venue
+  [venue]
+  (let [lat (:latitude venue)
+        lon (:longitude venue)
+        venue (dissoc venue :latitude :longitude)]
+    (merge venue
+           {:string_id (:slug venue)
+            :location_point {:lat lat
+                             :lon lon}})))
+
+(defmethod add-es-mapping-fields :tour
+  [tour]
+  (merge tour
+         {:string_id (:slug tour)}))
+
+(def ^:private eras
+  [[[1983 2000] "1.0"]
+   [[2002 2004] "2.0"]
+   [[2009 2100] "3.0"]])
+
+(defn- get-era [year]
+  (last (filter (fn [[[low high] era :as foo]]
+                  (and (>= year low) (<= year high)))
+                eras)))
+
+(defmethod add-es-mapping-fields :show
+  [{:keys [date] :as show}]
+  (let [year (parse-int (re-find #"\d{4}" date))]
+    (merge show
+           {:string_id date
+            :year year
+            :era (last (get-era year))})))
+
+(defmethod add-es-mapping-fields :default [v] v)
+
+
+
+
 (defonce ^:private models-cache (atom {}))
 
+(defmacro infix
+  "Use this macro when you pine for the notation of your childhood"
+  [infixed]
+  (list (second infixed) (first infixed) (last infixed)))
+
+;(defmacro select-with-type-added [model]
+  ;(list `select model))
+
+;(defmacro select-with-type-added [model]
+  ;`(select ~model))
+
+(defmacro select-with-type-added [model]
+  `(map
+     #(assoc % :_type (keyword
+                        (strng/replace
+                          (:name ~model) #"s$" "")))
+     (select ~model)))
+
+
 (def ^:private model-selectors
-  [[:api_client_cache #(select api_clients)]
-   [:user_cache       #(select users)]
-   [:tour_cache       #(map tour-for-es-mapping (select tours))]
-   [:venue_cache      #(map venue-for-es-mapping (select venues))]
-   [:show_cache       #(map show-for-es-mapping (select shows))]
-   [:track_cache      #(map track-for-es-mapping (select tracks))]])
+  [[:api_client_cache #(select-with-type-added api_clients)]
+   [:user_cache       #(select-with-type-added users)]
+   [:tour_cache       #(select-with-type-added tours)]
+   [:venue_cache      #(select-with-type-added venues)]
+   [:show_cache       #(select-with-type-added shows)]
+   [:track_cache      #(select-with-type-added tracks)]])
+
+(defn- map-id-to-entity
+  "Map an entity's :id to itself."
+  [coll]
+  (into {} (map #(vector (:id %) %) coll)))
 
 (defn- send-off-model-populate [func]
   (send-off (agent {}) (fn [_]
-                         (id-doc-map (func)))))
+                         (map-id-to-entity (func)))))
 
 (defn- await-populate-models []
   (apply await (vals @models-cache)))
+
+
+
+
 
 (defn- model-keywords [model-fk]
   (let [str-name (name model-fk)]
@@ -124,27 +156,37 @@
      :child-model-name      (keyword (strng/replace str-name #"_id" ""))
      :child-model-cache-key (keyword (strng/replace str-name #"_id" "_cache"))}))
 
+(defn- get-child-model [cached-models-agt parent-model child-model-fk]
+  (doc-for-elasticsearch (get @cached-models-agt (get parent-model child-model-fk))))
+
 (defn- assoc-model-fk
   "Associate the model referenced by fk with parent-model, and dissoc fk from
   parent-model."
   [parent-model fk]
-  (let [{:keys [child-model-cache-key
-                child-model-fk
-                child-model-name]} (model-keywords fk)]
-    ;TODO -- get track-for-es-mapping working
+  (let [{:keys [child-model-cache-key] :as model-keys} (model-keywords fk)]
     (if-let [cached-models-agt (get @models-cache child-model-cache-key)]
-      (let [cached-models @cached-models-agt
-            child-model-id (get parent-model child-model-fk)
-            child-model    (auto-join-fks (get cached-models child-model-id))]
+      (let [{:keys [child-model-fk child-model-name]} model-keys]
         (assoc
           (dissoc parent-model child-model-fk)
-          child-model-name child-model))
+          child-model-name
+          (get-child-model cached-models-agt parent-model child-model-fk)))
       parent-model)))
 
 (defn- model-foreign-keys [model]
   (filter (fn [k]
             (re-matches #"\A:.+_id\z" (str k)))
           (keys model)))
+
+(defn- auto-join-fks
+  "Detect and associate all foreign keys in model."
+  [model]
+  (reduce
+    (fn [model fk]
+      (assoc-model-fk model fk))
+    model
+    (model-foreign-keys model)))
+
+
 
 
 ;; HELPERS
@@ -162,6 +204,9 @@
   (first (select tours (order :created_at :DESC) (limit 1))))
 
 
+
+
+
 ;;     dMMMMb  dMP dMP dMMMMb  dMP     dMP .aMMMb
 ;;    dMP.dMP dMP dMP dMP"dMP dMP     amr dMP"VMP
 ;;   dMMMMP" dMP dMP dMMMMK" dMP     dMP dMP
@@ -176,11 +221,11 @@
                   model-selectors)))
   (await-populate-models))
 
-(defn auto-join-fks
-  "Detect and associate all foreign keys in model."
+(defn doc-for-elasticsearch
+  "Transform the model into an Elasticsearch document."
   [model]
-  (reduce
-    (fn [model fk]
-      (assoc-model-fk model fk))
+  (->
     model
-    (model-foreign-keys model)))
+    auto-join-fks
+    add-es-mapping-fields
+    (dissoc :_type)))
