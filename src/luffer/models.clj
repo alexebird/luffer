@@ -32,7 +32,7 @@
 
 (defdb db (postgres (conn-map (System/getenv "PG_URL"))))
 
-(declare plays users tracks shows tours venues api_clients)
+;(declare plays users tracks shows tours venues api_clients)
 
 (defentity plays
   (entity-fields :id :source :created_at :ip_address :api_client_id :user_id :track_id))
@@ -44,14 +44,6 @@
   (entity-fields :id :title :slug :position :show_id :position_in_set
                  :position_in_show :duration :set :set_name :set_index :mp3
                  :unique_slug :source :created_at))
-  ; :string_id => :unique_slug
-  ; :set_data [
-  ;   :string_id => :show.date$:set_name
-  ;   :id => :show.id$:set_name
-  ;   :index => :set_index
-  ;   :name => :set
-  ;   :full_name => :set_name
-  ;  ]
 
 (defentity shows
   (entity-fields :id :date :duration :sbd :remastered :source :tour_id :venue_id))
@@ -65,25 +57,13 @@
 (defentity api_clients
   (entity-fields :id :name :description))
 
-
 (defn- id-doc-map
   "map ids to entities"
   [coll]
   (into {} (map #(vector (:id %) %) coll)))
 
-;(defn join-by-id
-  ;"Join in-memory models. Iterate the primary collection and set a key for each matching lookup-collection model."
-  ;([pcoll lcoll pkey lkey] (join-by-id pcoll lcoll pkey lkey nil))
-  ;([pcoll lcoll pkey lkey join-fn]
-     ;(into {} (map (fn [[pid pm]]
-                     ;(let [joined-pm (assoc pm pkey (get lcoll (get pm lkey)))]
-                       ;[pid (if join-fn
-                              ;(join-fn joined-pm)
-                              ;joined-pm)]))
-                   ;pcoll))))
-
-(defn- venue-with-derived-fields
-  "Add fields required by the ES mapping."
+(defn- venue-for-es-mapping
+  "Add venue fields required by the ES mapping."
   [venue]
   (let [lat (:latitude venue)
         lon (:longitude venue)
@@ -93,37 +73,33 @@
             :location_point {:lat lat
                              :lon lon}})))
 
-(defn- venue-for-es-mapping [venue]
-  (-> venue
-      venue-with-derived-fields))
-
-(defn- tour-with-derived-fields
-  "Add fields required by the ES mapping."
+(defn- tour-for-es-mapping
+  "Add tour fields required by the ES mapping."
   [tour]
   (merge tour
          {:string_id (:slug tour)}))
 
-(defn- tour-for-es-mapping [tour]
-  (tour-with-derived-fields tour))
-
-(defn- show-with-derived-fields
-  "Add fields required by the ES mapping."
+(defn- show-for-es-mapping
+  "Add show fields required by the ES mapping."
   [{:keys [date] :as show}]
   (let [year (parse-int (re-find #"\d{4}" date))]
     (merge show
            {:string_id date
             :year year
-            :era (get-era year)})))
+            :era (last (get-era year))})))
 
-(defn- show-with-tour [show]
-  )
-
-  ; :string_id => :date
-  ; :year => :date substring
-  ; :era => some kind of mapping
-
-(defn- show-for-es-mapping [show]
-  (show-with-derived-fields show))
+(defn- track-for-es-mapping
+  "Add track fields required by the ES mapping."
+  [{:keys [unique_slug set_name set_index set show] :as track}]
+  (let [date (:date show)
+        show_id (:id show)]
+    (merge track
+           {:string_id unique_slug
+            :set_data {:string_id (str date "$" set_name)
+                       :id (str show_id "$" set_name)
+                       :index set_index
+                       :name set
+                       :full_name set_name}})))
 
 (defonce ^:private models-cache (atom {}))
 
@@ -133,7 +109,7 @@
    [:tour_cache       #(map tour-for-es-mapping (select tours))]
    [:venue_cache      #(map venue-for-es-mapping (select venues))]
    [:show_cache       #(map show-for-es-mapping (select shows))]
-   [:track_cache      #(select tracks)]])
+   [:track_cache      #(map track-for-es-mapping (select tracks))]])
 
 (defn- send-off-model-populate [func]
   (send-off (agent {}) (fn [_]
@@ -141,27 +117,6 @@
 
 (defn- await-populate-models []
   (apply await (vals @models-cache)))
-
-;(def tracks-joined
-  ;'(join-by-id
-    ;tracks-by-id
-    ;(->
-      ;(identity shows-by-id)
-      ;(join-by-id venues-by-id :venue :venue_id)
-      ;(join-by-id tours-by-id :tour :tour_id))
-    ;:show
-    ;:show_id
-    ;#(assoc %
-            ;:unique_slug
-            ;(strng/join "/" [(get-in % [:show :date]) (get-in % [:slug])]))))
-
-;(defn assoc-track
-  ;"associate the track with the play"
-  ;[play]
-  ;(let [track (get @(:tracks @models-cache) (get play :track_id))]
-    ;(assoc
-      ;(dissoc play :track_id)
-      ;:track track)))
 
 (defn- model-keywords [model-fk]
   (let [str-name (name model-fk)]
@@ -176,6 +131,7 @@
   (let [{:keys [child-model-cache-key
                 child-model-fk
                 child-model-name]} (model-keywords fk)]
+    ;TODO -- get track-for-es-mapping working
     (if-let [cached-models-agt (get @models-cache child-model-cache-key)]
       (let [cached-models @cached-models-agt
             child-model-id (get parent-model child-model-fk)

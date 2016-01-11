@@ -1,5 +1,6 @@
 require 'redis'
 require 'pry'
+require 'twilio-ruby'
 
 class PlaysExporter
   PLAYS_QUEUE = 'pts-exporter-queue'
@@ -10,12 +11,14 @@ class PlaysExporter
     url = ENV['REDIS_URL']
     @redis = Redis.new(url: url)
     raise("couldn't talk to redis") unless @redis.ping == 'PONG'
+    @twilio = Twilio::REST::Client.new(ENV['TWILIO_SID'], ENV['TWILIO_AUTH_TOKEN'])
     @start, @size, @stop_exclusive = start, size, stop
     puts "work queue on #{url} '#{PLAYS_QUEUE}' size is #{work_queue_size}"
   end
 
   def run
     enqueue_jobs(@start, @size, @stop_exclusive)
+    notify_done
     cleanup
   end
 
@@ -52,6 +55,14 @@ class PlaysExporter
       @redis.lpush(PLAYS_QUEUE, jobs)
       block_if_work_queue_size_above(5)
     end
+  end
+
+  private def notify_done
+    @twilio.messages.create(
+      from: ENV['TWILIO_NUMBER'],
+      to: ENV['ALERT_NUMBER'],
+      body: 'That thing you wanted is done.'
+    )
   end
 
   private def cleanup
