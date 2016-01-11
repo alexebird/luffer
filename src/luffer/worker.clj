@@ -6,7 +6,7 @@
             ;[clojure.tools.trace]
             [clojure.tools.cli :refer [parse-opts]]
             [clojure.pprint]
-            [taoensso.carmine :as car :refer [wcar]]
+            [taoensso.carmine :as redis :refer [wcar]]
             [korma.core :refer [select* order exec where]]
             [clojurewerkz.elastisch.rest :as es]
             [clojurewerkz.elastisch.rest.bulk :as esbulk])
@@ -18,7 +18,7 @@
 (def ^:private plays-queue "pts-exporter-queue")
 ;; Redis
 (def ^:private redis-conn {:pool {} :spec {:uri (System/getenv "REDIS_URL")}})
-(defmacro wcar* [& body] `(car/wcar redis-conn ~@body))
+(defmacro wcar* [& body] `(redis/wcar redis-conn ~@body))
 (def ^:private futures (atom []))
 
 
@@ -52,7 +52,7 @@
     nil))
 
 (defn- dequeue-work! []
-  (parse-work (wcar* (car/rpop plays-queue))))
+  (parse-work (wcar* (redis/rpop plays-queue))))
 
 (defn- print-work [worker-id [start-id stop-id :as work]]
   (if work
@@ -63,8 +63,8 @@
     (print-work i work)
     (if work
       (let [timing (secs (callback work))]
-        (wcar* (car/incr "export-count"))
-        (wcar* (car/incrbyfloat "export-timing" timing)))
+        (wcar* (redis/incr "export-count"))
+        (wcar* (redis/incrbyfloat "export-timing" timing)))
       (Thread/sleep 250)))
   nil)
 

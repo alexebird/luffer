@@ -71,11 +71,13 @@
   [venue]
   (let [lat (:latitude venue)
         lon (:longitude venue)
+        has-point (boolean (and lat lon))
         venue (dissoc venue :latitude :longitude)]
     (merge venue
            {:string_id (:slug venue)
-            :location_point {:lat lat
-                             :lon lon}})))
+            :location_point (if has-point
+                              {:lat (double lat) :lon (double lon)}
+                              nil)})))
 
 (defmethod add-es-mapping-fields :tour
   [tour]
@@ -192,7 +194,8 @@
 ;; HELPERS
 
 (defn- one-play []
-  (first (select plays (order :created_at :DESC) (limit 1) (where {:id 7543482}))))
+  (first (select plays (order :created_at :DESC) (limit 1) (where {:id 490987}))))
+  ;(first (select plays (order :created_at :DESC) (limit 1) (where {:id 7543482}))))
 
 (defn- one-track []
   (first (select tracks (order :created_at :DESC) (limit 1))))
