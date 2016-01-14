@@ -4,8 +4,8 @@ set -e
 
 check_required_env() {
   if [ -z "${ES_URL}" ]; then
-	echo 'must export ES_URL'
-	exit 1
+    echo 'must export ES_URL'
+    exit 1
   fi
 
   if [ -z "${DO_API_KEY}" ]; then
@@ -14,8 +14,8 @@ check_required_env() {
   fi
 }
 
-put_plays_template() {
-  local templ='plays'
+put_template() {
+  local templ="${1:?missing arg 1: index prefix}"
   curl "${ES_URL}/_template/${templ}" -XPUT -d@"templates/${templ}.json" | jq '.'
 }
 
