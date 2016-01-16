@@ -12,7 +12,7 @@ class PlaysExporter
     @redis = Redis.new(url: url)
     raise("couldn't talk to redis") unless @redis.ping == 'PONG'
     @twilio = Twilio::REST::Client.new(ENV['TWILIO_SID'], ENV['TWILIO_AUTH_TOKEN'])
-    @start, @size, @stop_exclusive = start, size, stop
+    @start, @size, @stop_exclusive = start.to_i, size.to_i, stop.to_i
     puts "work queue on #{url} '#{PLAYS_QUEUE}' size is #{work_queue_size}"
   end
 
