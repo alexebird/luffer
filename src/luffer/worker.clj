@@ -7,7 +7,7 @@
             [clojure.tools.cli :refer [parse-opts]]
             [clojure.pprint]
             [taoensso.carmine :as redis :refer [wcar]]
-            [korma.core :refer [select* order exec where]]
+            [korma.core :refer [raw exec-raw aggregate select select* fields order exec where group as-sql]]
             [clojurewerkz.elastisch.rest :as es]
             [clojurewerkz.elastisch.rest.bulk :as esbulk])
   (:use [luffer.models :only [plays doc-for-elasticsearch]]
@@ -33,11 +33,58 @@
   (let [play-models (-> query exec)]
     (map doc-for-elasticsearch play-models)))
 
+; TODO build-query needs to select by time buckets - UTC timestamps
+; Can we group Plays by track_id? Ignoring the other fields in play that would complicate the grouping.
+; Then add a count field that gets indexed to represent the number in the bucket.
 (defn- build-query [[start-id stop-id]]
   (-> (select* plays)
       (order :id :ASC)
       (where {:id [<  stop-id]})
-      (where {:id [>= start-id]})))
+      (where {:id [>= start-id]})
+      ;(as-sql)
+      ))
+
+;(defn- build-query-dates [[start-date stop-date]]
+  ;(-> (select* :plays)
+      ;(fields :track_id :created_at)
+      ;(order :created_at :ASC)
+      ;(where {:created_at [>= (clojure.instant/read-instant-timestamp start-date)]})
+      ;(where {:created_at [<  (clojure.instant/read-instant-timestamp stop-date)]})
+      ;(group :track_id)))
+
+(defn- build-query-dates [[start-date stop-date]]
+  (-> (select*
+        (raw (str "(SELECT plays.track_id, plays.created_at FROM plays WHERE (plays.created_at >= timestamp '" start-date "') AND (\"plays\".\"created_at\" < timestamp '" stop-date "')) AS foo")))
+      (fields "foo.track_id" (raw "COUNT(foo.track_id) AS cnt"))
+      ;(aggregate (count :*) :cnt :track_id)
+      (group "foo.track_id")))
+
+;(defn- build-query-dates [[start-date stop-date]]
+  ;(-> (select* (table
+                 ;(-> (select* :plays)
+                     ;(fields :track_id :created_at)
+                     ;(where {:created_at [>= (clojure.instant/read-instant-timestamp start-date)]})
+                     ;(where {:created_at [<  (clojure.instant/read-instant-timestamp stop-date)]}))
+                 ;:foo))
+      ;(fields :track_id)
+      ;(aggregate (count :*) :cnt :track_id)
+      ;(group :track_id)
+      ;))
+
+;(defn- build-query-dates [[start-date stop-date]]
+  ;(exec-raw [(slurp "group_by_tracks.sql") [start-date stop-date]] ))
+
+
+;SELECT "foo"."track_id", COUNT("foo"."track_id") AS count
+;FROM (
+    ;SELECT "plays"."track_id", "plays"."created_at"
+    ;FROM "plays"
+    ;WHERE
+      ;("plays"."created_at" >= timestamp '2016-06-01T00:00:00Z')
+      ;AND ("plays"."created_at" < timestamp '2016-07-01T00:00:00Z')
+    ;-- ;
+;) AS foo
+;GROUP BY "foo"."track_id";
 
 (defn- get-documents-for-work [work]
   (select-plays (build-query work)))

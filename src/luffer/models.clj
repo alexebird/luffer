@@ -1,6 +1,6 @@
 (ns luffer.models
   (:require [clojure.string  :as strng]
-            [korma.core      :refer [select where with order limit defentity entity-fields has-many belongs-to]]
+            [korma.core      :refer [subselect fields table select where with order limit defentity entity-fields has-many belongs-to]]
             [korma.db        :refer [defdb postgres]]
             [clj-time.core   :as time]
             [clj-time.format :as timefmt])
@@ -20,8 +20,12 @@
 
 (defn- conn-map [pg-uri]
   (let [re (re-pattern (strng/join "(.+)" ["postgresql://" ":" "@" ":" "/" ""])) ]
-    (zipmap [:user :password :host :port :db]
-            (rest (re-matches re pg-uri)))))
+    (->
+      (zipmap [:user :password :host :port :db]
+             (rest (re-matches re pg-uri)))
+      (merge {:ssl true
+              :sslmode "require"
+              }))))
 
 (defdb db (postgres (conn-map (System/getenv "PG_URL"))))
 
@@ -47,6 +51,14 @@
 
 (defentity api_clients
   (entity-fields :id :name :description))
+
+;(defentity subselect-plays
+  ;(table (subselect
+           ;:plays
+           ;(fields :track_id :created_at)
+           ;(where {:created_at [>= (clojure.instant/read-instant-timestamp start-date)]})
+           ;(where {:created_at [<  (clojure.instant/read-instant-timestamp stop-date)]}))
+         ;:foo))
 
 
 
@@ -109,10 +121,10 @@
 
 (defonce ^:private models-cache (atom {}))
 
-(defmacro infix
-  "Use this macro when you pine for the notation of your childhood"
-  [infixed]
-  (list (second infixed) (first infixed) (last infixed)))
+;(defmacro infix
+  ;"Use this macro when you pine for the notation of your childhood"
+  ;[infixed]
+  ;(list (second infixed) (first infixed) (last infixed)))
 
 ;(defmacro select-with-type-added [model]
   ;(list `select model))
@@ -193,18 +205,18 @@
 
 ;; HELPERS
 
-(defn- one-play []
-  (first (select plays (order :created_at :DESC) (limit 1) (where {:id 490987}))))
-  ;(first (select plays (order :created_at :DESC) (limit 1) (where {:id 7543482}))))
+;(defn- one-play []
+  ;(first (select plays (order :created_at :DESC) (limit 1) (where {:id 490987}))))
+  ;;(first (select plays (order :created_at :DESC) (limit 1) (where {:id 7543482}))))
 
-(defn- one-track []
-  (first (select tracks (order :created_at :DESC) (limit 1))))
+;(defn- one-track []
+  ;(first (select tracks (order :created_at :DESC) (limit 1))))
 
-(defn- one-show []
-  (first (select shows (order :created_at :DESC) (limit 1))))
+;(defn- one-show []
+  ;(first (select shows (order :created_at :DESC) (limit 1))))
 
-(defn- one-tour []
-  (first (select tours (order :created_at :DESC) (limit 1))))
+;(defn- one-tour []
+  ;(first (select tours (order :created_at :DESC) (limit 1))))
 
 
 
