@@ -53,11 +53,16 @@
       ;(group :track_id)))
 
 (defn- build-query-dates [[start-date stop-date]]
-  (-> (select*
-        (raw (str "(SELECT plays.track_id, plays.created_at FROM plays WHERE (plays.created_at >= timestamp '" start-date "') AND (\"plays\".\"created_at\" < timestamp '" stop-date "')) AS foo")))
-      (fields "foo.track_id" (raw "COUNT(foo.track_id) AS cnt"))
-      ;(aggregate (count :*) :cnt :track_id)
-      (group "foo.track_id")))
+  (let [query (-> (select*
+                    (raw (str "(SELECT plays.track_id, plays.created_at FROM plays WHERE (plays.created_at >= timestamp '"
+                              start-date
+                              "') AND (plays.created_at < timestamp '"
+                              stop-date
+                              "')) AS foo")))
+                  (fields "foo.track_id" (raw "COUNT(foo.track_id) AS all_plays_count") (raw (str "'" stop-date "' AS created_at")))
+                  (group "foo.track_id"))]
+    (println (as-sql query))
+    query))
 
 ;(defn- build-query-dates [[start-date stop-date]]
   ;(-> (select* (table
@@ -87,15 +92,15 @@
 ;GROUP BY "foo"."track_id";
 
 (defn- get-documents-for-work [work]
-  (select-plays (build-query work)))
+  (select-plays (build-query-dates work)))
 
 (defn- bulk-index-plays [index docs]
-  (if-not (empty? docs)
+  (if-not (or (nil? docs) (empty? docs))
     (esbulk/bulk-with-index-and-type es-conn index "play" (esbulk/bulk-index docs))))
 
 (defn- parse-work [raw]
   (if raw
-    (map parse-int (str/split raw #"-"))
+    (map str (str/split raw #"\$"))
     nil))
 
 (defn- dequeue-work! []
@@ -103,7 +108,7 @@
 
 (defn- print-work [worker-id [start-id stop-id :as work]]
   (if work
-    (println (format "worker %d exporting [%,d - %,d)" worker-id start-id stop-id))))
+    (println (format "worker %d exporting [%s - %s)" worker-id (str start-id) (str stop-id)))))
 
 (defn- do-work [i callback]
   (let [work (dequeue-work!)]
@@ -112,7 +117,7 @@
       (let [timing (secs (callback work))]
         (wcar* (redis/incr "export-count"))
         (wcar* (redis/incrbyfloat "export-timing" timing)))
-      (Thread/sleep 250)))
+      (Thread/sleep 100)))
   nil)
 
 (defn- worker-loop [i callback]

@@ -200,6 +200,13 @@
     model
     (model-foreign-keys model)))
 
+(defn- assoc-play-counts [play]
+  (if-let [all-plays-count (:all_plays_count play)]
+    (if-let [track-duration  (get-in play [:track :duration])]
+      (merge play {:all_plays_duration (* all-plays-count track-duration)})
+      play)
+    play))
+
 
 
 
@@ -242,5 +249,6 @@
   (->
     model
     auto-join-fks
+    assoc-play-counts
     add-es-mapping-fields
     (dissoc :_type)))
