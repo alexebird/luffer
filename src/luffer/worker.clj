@@ -140,3 +140,5 @@
       (map
         (fn [i] (future (worker-loop i #(bulk-index-plays index (get-documents-for-work %)))))
         (range concurrency)))))
+
+;(->> (map (fn [[k new-name]] [new-name (get-in x k)]) [[[:created_at] :created_at] [[:track :duration] :track_duration] [[:all_plays_count] :all_plays_count] [[:track :show :date] :show_date] [[:all_plays_duration] :all_plays_duration] [[:track :title] :track_title] [[:track :show :venue :name] :venue_name] [[:track :show :venue :location] :venue_location] [[:track :slug] :track_slug] [[:track :show :tour :name] :tour_name] [[:track :show :tour :starts_on] :tour_start_date] [[:track :show :tour :ends_on] :tour_end_date] [[:track :show :venue :past_names] :venue_past_names] [[:track :show :year] :year] [[:track :show :era] :era] [[:track :show :remastered] :remastered] [[:track :show :sbd] :sbd] [[:track :mp3] :mp3] [[:track :unique_slug] :track_unique_slug] ]) (into {}))
