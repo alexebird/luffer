@@ -15,6 +15,10 @@
    ["-i" "--index ES_INDEX" "Elasticsearch index to export to"
     :validate [#(not (empty? %)) "Must exist"]]
 
+   ["-w" "--work-type NAME" "Type of work to do"
+    :default "ids"
+    :validate [#(not (empty? %)) "Must exist"]]
+
    ["-c" "--concurrency CONCURRENCY" "Number of exporters to run concurrently"
     :default 1
     ;; Specify a string to output in the default column in the options summary

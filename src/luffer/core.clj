@@ -5,6 +5,6 @@
 
 (defn -main [& args]
   (handle-args args
-               #(let [{:keys [concurrency index]} %]
+               #(let [{:keys [concurrency work-type index]} %]
                   (luffer.models/populate-model-cache)
-                  (run-workers concurrency index))))
+                  (run-workers concurrency work-type index))))

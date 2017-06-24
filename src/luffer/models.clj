@@ -1,6 +1,6 @@
 (ns luffer.models
   (:require [clojure.string  :as strng]
-            [korma.core      :refer [subselect fields table select where with order limit defentity entity-fields has-many belongs-to]]
+            [korma.core      :refer [select where with order limit defentity entity-fields has-many belongs-to]]
             [korma.db        :refer [defdb postgres]]
             [clj-time.core   :as time]
             [clj-time.format :as timefmt])
@@ -9,7 +9,8 @@
 
 ;; DECLARATIONS
 
-(declare doc-for-elasticsearch)
+(declare doc-for-elasticsearch-ids)
+(declare doc-for-elasticsearch-dates)
 
 
 ;;     dMMMMb  dMMMMb  dMP dMP dMP .aMMMb dMMMMMMP dMMMMMP
@@ -27,7 +28,7 @@
               :sslmode "require"
               }))))
 
-(defdb db (postgres (conn-map (System/getenv "PG_URL"))))
+(defdb db (postgres (conn-map (System/getenv "DATABASE_URL"))))
 
 (defentity plays
   (entity-fields :id :source :created_at :ip_address :api_client_id :user_id :track_id))
@@ -51,14 +52,6 @@
 
 (defentity api_clients
   (entity-fields :id :name :description))
-
-;(defentity subselect-plays
-  ;(table (subselect
-           ;:plays
-           ;(fields :track_id :created_at)
-           ;(where {:created_at [>= (clojure.instant/read-instant-timestamp start-date)]})
-           ;(where {:created_at [<  (clojure.instant/read-instant-timestamp stop-date)]}))
-         ;:foo))
 
 
 
@@ -121,10 +114,10 @@
 
 (defonce ^:private models-cache (atom {}))
 
-;(defmacro infix
-  ;"Use this macro when you pine for the notation of your childhood"
-  ;[infixed]
-  ;(list (second infixed) (first infixed) (last infixed)))
+(defmacro infix
+  "Use this macro when you pine for the notation of your childhood"
+  [infixed]
+  (list (second infixed) (first infixed) (last infixed)))
 
 ;(defmacro select-with-type-added [model]
   ;(list `select model))
@@ -171,7 +164,8 @@
      :child-model-cache-key (keyword (strng/replace str-name #"_id" "_cache"))}))
 
 (defn- get-child-model [cached-models-agt parent-model child-model-fk]
-  (doc-for-elasticsearch (get @cached-models-agt (get parent-model child-model-fk))))
+  ; I think child models only need the -ids version
+  (doc-for-elasticsearch-ids (get @cached-models-agt (get parent-model child-model-fk))))
 
 (defn- assoc-model-fk
   "Associate the model referenced by fk with parent-model, and dissoc fk from
@@ -212,18 +206,18 @@
 
 ;; HELPERS
 
-;(defn- one-play []
-  ;(first (select plays (order :created_at :DESC) (limit 1) (where {:id 490987}))))
-  ;;(first (select plays (order :created_at :DESC) (limit 1) (where {:id 7543482}))))
+(defn- one-play []
+  (first (select plays (order :created_at :DESC) (limit 1) (where {:id 490987}))))
+  ;(first (select plays (order :created_at :DESC) (limit 1) (where {:id 7543482}))))
 
-;(defn- one-track []
-  ;(first (select tracks (order :created_at :DESC) (limit 1))))
+(defn- one-track []
+  (first (select tracks (order :created_at :DESC) (limit 1))))
 
-;(defn- one-show []
-  ;(first (select shows (order :created_at :DESC) (limit 1))))
+(defn- one-show []
+  (first (select shows (order :created_at :DESC) (limit 1))))
 
-;(defn- one-tour []
-  ;(first (select tours (order :created_at :DESC) (limit 1))))
+(defn- one-tour []
+  (first (select tours (order :created_at :DESC) (limit 1))))
 
 
 
@@ -243,7 +237,16 @@
                   model-selectors)))
   (await-populate-models))
 
-(defn doc-for-elasticsearch
+(defn doc-for-elasticsearch-ids
+  "Transform the model into an Elasticsearch document."
+  [model]
+  (->
+    model
+    auto-join-fks
+    add-es-mapping-fields
+    (dissoc :_type)))
+
+(defn doc-for-elasticsearch-dates
   "Transform the model into an Elasticsearch document."
   [model]
   (->
