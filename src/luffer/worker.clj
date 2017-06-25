@@ -58,7 +58,7 @@
                               "')) AS foo")))
                   (fields "foo.track_id" (raw "COUNT(foo.track_id) AS all_plays_count") (raw (str "'" stop-date "' AS created_at")))
                   (group "foo.track_id"))]
-    (println (as-sql query))
+    ;(println (as-sql query))
     query))
 
 (defn- get-documents-for-work-dates [work]
@@ -101,7 +101,7 @@
 
 (defn- do-work [i dequeue-fn print-fn callback]
   (let [work (dequeue-fn)]
-    (apply print-fn i work)
+    (print-fn i work)
     (if work
       (let [timing (secs (callback work))]
         (wcar* (redis/incr "export-count"))
@@ -151,12 +151,8 @@
                           i
                           (get-dequeue-fn work-type)
                           (print-work-fn work-type)
-                          #(apply
-                             (bulk-index-plays-fn work-type)
-                             index
-                             (apply
-                               (get-documents-fn work-type)
-                               %)))))
+                          #((bulk-index-plays-fn work-type)
+                            index
+                            ((get-documents-fn work-type)
+                             %)))))
         (range concurrency)))))
-
-;(->> (map (fn [[k new-name]] [new-name (get-in x k)]) [[[:created_at] :created_at] [[:track :duration] :track_duration] [[:all_plays_count] :all_plays_count] [[:track :show :date] :show_date] [[:all_plays_duration] :all_plays_duration] [[:track :title] :track_title] [[:track :show :venue :name] :venue_name] [[:track :show :venue :location] :venue_location] [[:track :slug] :track_slug] [[:track :show :tour :name] :tour_name] [[:track :show :tour :starts_on] :tour_start_date] [[:track :show :tour :ends_on] :tour_end_date] [[:track :show :venue :past_names] :venue_past_names] [[:track :show :year] :year] [[:track :show :era] :era] [[:track :show :remastered] :remastered] [[:track :show :sbd] :sbd] [[:track :mp3] :mp3] [[:track :unique_slug] :track_unique_slug] ]) (into {}))

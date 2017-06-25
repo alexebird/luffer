@@ -4,7 +4,8 @@
             [korma.db        :refer [defdb postgres]]
             [clj-time.core   :as time]
             [clj-time.format :as timefmt])
-  (:use [luffer.util :only [parse-int]]))
+  (:use [luffer.util :only [parse-int]]
+        [luffer.tracks :only [dense-doc]]))
 
 
 ;; DECLARATIONS
@@ -194,14 +195,8 @@
     model
     (model-foreign-keys model)))
 
-(defn- assoc-play-counts [play]
-  (if-let [all-plays-count (:all_plays_count play)]
-    (if-let [track-duration  (get-in play [:track :duration])]
-      (merge play {:all_plays_duration (* all-plays-count track-duration)})
-      play)
-    play))
-
-
+(defn- clean-doc [doc]
+  (dissoc doc :_type))
 
 
 ;; HELPERS
@@ -237,21 +232,15 @@
                   model-selectors)))
   (await-populate-models))
 
-(defn doc-for-elasticsearch-ids
-  "Transform the model into an Elasticsearch document."
-  [model]
+(defn doc-for-elasticsearch-ids [model]
   (->
     model
     auto-join-fks
     add-es-mapping-fields
-    (dissoc :_type)))
+    clean-doc))
 
-(defn doc-for-elasticsearch-dates
-  "Transform the model into an Elasticsearch document."
-  [model]
+(defn doc-for-elasticsearch-dates [model]
   (->
     model
-    auto-join-fks
-    assoc-play-counts
-    add-es-mapping-fields
-    (dissoc :_type)))
+    doc-for-elasticsearch-ids
+    dense-doc))

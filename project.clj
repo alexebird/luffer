@@ -14,4 +14,5 @@
                  [com.taoensso/carmine "2.12.1"]
                  [clj-time "0.11.0"]]
   :main luffer.core
-  :profiles {:dev {:main luffer.models}})
+  :aot  [luffer.core]
+  :profiles {:dev {:main luffer.worker}})
