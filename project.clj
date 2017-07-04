@@ -15,4 +15,4 @@
                  [clj-time "0.11.0"]]
   :main luffer.core
   :aot  [luffer.core]
-  :profiles {:dev {:main luffer.worker}})
+  :profiles {:dev {:main luffer.core}})

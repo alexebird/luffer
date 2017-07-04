@@ -10,8 +10,8 @@
 
 ;; DECLARATIONS
 
-(declare doc-for-elasticsearch-ids)
-(declare doc-for-elasticsearch-dates)
+(declare es-doc)
+;(declare doc-for-elasticsearch-dates)
 
 
 ;;     dMMMMb  dMMMMb  dMP dMP dMP .aMMMb dMMMMMMP dMMMMMP
@@ -110,21 +110,12 @@
 
 (defmethod add-es-mapping-fields :default [v] v)
 
-
-
-
 (defonce ^:private models-cache (atom {}))
 
 (defmacro infix
   "Use this macro when you pine for the notation of your childhood"
   [infixed]
   (list (second infixed) (first infixed) (last infixed)))
-
-;(defmacro select-with-type-added [model]
-  ;(list `select model))
-
-;(defmacro select-with-type-added [model]
-  ;`(select ~model))
 
 (defmacro select-with-type-added [model]
   `(map
@@ -164,21 +155,21 @@
      :child-model-name      (keyword (strng/replace str-name #"_id" ""))
      :child-model-cache-key (keyword (strng/replace str-name #"_id" "_cache"))}))
 
-(defn- get-child-model [cached-models-agt parent-model child-model-fk]
+(defn- get-child-model [cached-models-agent parent-model child-model-fk]
   ; I think child models only need the -ids version
-  (doc-for-elasticsearch-ids (get @cached-models-agt (get parent-model child-model-fk))))
+  (es-doc (get @cached-models-agent (get parent-model child-model-fk))))
 
 (defn- assoc-model-fk
   "Associate the model referenced by fk with parent-model, and dissoc fk from
   parent-model."
   [parent-model fk]
   (let [{:keys [child-model-cache-key] :as model-keys} (model-keywords fk)]
-    (if-let [cached-models-agt (get @models-cache child-model-cache-key)]
+    (if-let [cached-models-agent (get @models-cache child-model-cache-key)]
       (let [{:keys [child-model-fk child-model-name]} model-keys]
         (assoc
           (dissoc parent-model child-model-fk)
           child-model-name
-          (get-child-model cached-models-agt parent-model child-model-fk)))
+          (get-child-model cached-models-agent parent-model child-model-fk)))
       parent-model)))
 
 (defn- model-foreign-keys [model]
@@ -224,7 +215,7 @@
 ;;  dMP     dMP.aMP dMP.aMF dMP     dMP dMP.aMP
 ;; dMP      VMMMP" dMMMMP" dMMMMMP dMP  VMMMP"
 
-(defn populate-model-cache []
+(defn populate-model-cache! []
   (reset!
     models-cache
     (into {} (map (fn [[name func]]
@@ -232,15 +223,14 @@
                   model-selectors)))
   (await-populate-models))
 
-(defn doc-for-elasticsearch-ids [model]
-  (->
-    model
-    auto-join-fks
-    add-es-mapping-fields
-    clean-doc))
+(defn es-doc [model]
+  (-> model
+      auto-join-fks
+      add-es-mapping-fields
+      clean-doc))
 
-(defn doc-for-elasticsearch-dates [model]
-  (->
-    model
-    doc-for-elasticsearch-ids
-    dense-doc))
+;(defn doc-for-elasticsearch-dates [model]
+  ;(-> model
+      ;pts-document
+      ;dense-doc
+      ;))
