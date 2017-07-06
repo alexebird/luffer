@@ -1,10 +1,12 @@
 (ns luffer.core
   (:gen-class)
-  (:use [luffer.cli    :only [handle-args]]
-        [luffer.worker2 :only [run-workers]]))
+  (:use [luffer.cli]
+        [luffer.work]
+        [luffer.models]
+        [luffer.worker2]))
 
 (defn -main [& args]
-  (handle-args args
+  (luffer.cli/handle-args args
                #(let [{:keys [concurrency work-type index]} %]
                   ;(luffer.models/populate-model-cache!)
-                  (run-workers concurrency work-type index))))
+                  (luffer.worker2/run-workers concurrency work-type index))))

@@ -1,11 +1,14 @@
 (ns luffer.work
   (:require
     [cheshire.core :as json]
+    [clojurewerkz.elastisch.rest :as es]
+    [clojurewerkz.elastisch.rest.bulk :as esbulk]
     [korma.core :refer [raw exec-raw aggregate select* fields order where group]])
   (:use
     [luffer.models :as models :only [plays]]))
 
 (def dry-run false)
+(def ^:private es-conn (es/connect (System/getenv "ES_URL")))
 
 (defprotocol Work
   "Protocol for work."
@@ -33,7 +36,7 @@
       (case type
         "ids"   (->IdsWork type (get work "factor_name") (get work "start_id") (get work "end_id"))
         ;"dates" (->DatesWork type (get work "factor_name") (get work "start_id") (get work "end_id"))
-        :else (throw (Exception. "no matching work type"))))
+        :else (println "wtf")))
     nil))
 
 (defn- exec [record]
@@ -53,3 +56,9 @@
 (defn to-pts-docs [work-str]
   (let [record (parse-work work-str)]
     (results-to-docs (exec record) record)))
+
+(defn bulk-index-docs [index docs]
+  (if-not (empty? docs)
+    (->>
+      (esbulk/bulk-index docs)
+      (esbulk/bulk-with-index-and-type es-conn index "track"))))

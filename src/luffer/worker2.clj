@@ -1,8 +1,5 @@
 (ns luffer.worker2
   (:require
-    [clojure.string :as str]
-    [clj-http.client :as http]
-    [clojure.pprint]
     [taoensso.carmine :as redis :refer [wcar]]))
 
 (def ^:private plays-queue "pts-exporter-queue")
@@ -13,15 +10,15 @@
 (defmacro wcar* [& body]
   `(redis/wcar redis-conn ~@body))
 
-(defn print-work [i work]
-  (printf "%d: %s\n" i work))
+;(defn print-work [i work]
+  ;(printf "%d: %s\n" i work))
 
 (defn- dequeue-job []
   (wcar* (redis/brpop plays-queue 1)))
 
 (defn- perform-job [input-work work-fn]
-  (if (not (nil? input-work))
-    (do
+  (if-not (nil? input-work)
+    (let [input-work (last input-work)]
       (println "perform-job")
       (swap! future-count inc)
       (swap! job-count inc)
