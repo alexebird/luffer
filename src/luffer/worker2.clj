@@ -16,17 +16,25 @@
 (defn- dequeue-job []
   (wcar* (redis/brpop plays-queue 1)))
 
+(defn run-future [work-fn input-work]
+  (future
+    (do
+      (try
+        (work-fn input-work @future-count)
+        (catch Exception e (do (println e)
+                               e)))
+      (swap! future-count dec)
+      nil)))
+
 (defn- perform-job [input-work work-fn]
-  (if-not (nil? input-work)
+  (if (nil? input-work)
+    (println "input-work is nil")
     (let [input-work (last input-work)]
       (println "perform-job")
       (swap! future-count inc)
       (swap! job-count inc)
       (printf "job future-count=%d job-count=%d work=%s\n" @future-count @job-count input-work)
-      (future
-        (do
-          (work-fn input-work @future-count)
-          (swap! future-count dec))))))
+      (run-future work-fn input-work))))
 
 (defn run-workers [concurrency index-prefix work-fn]
   (reset! job-count 0)
@@ -36,6 +44,6 @@
     (if (< @future-count concurrency)
       (perform-job (dequeue-job) work-fn)
       (do
-        (println "no work")
+        (println "at capacity")
         (Thread/sleep 500))))
   (printf "jobs=%d\n" @job-count))
