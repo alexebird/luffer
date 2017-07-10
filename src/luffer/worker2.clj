@@ -10,9 +10,6 @@
 (defmacro wcar* [& body]
   `(redis/wcar redis-conn ~@body))
 
-;(defn print-work [i work]
-  ;(printf "%d: %s\n" i work))
-
 (defn- dequeue-job []
   (wcar* (redis/brpop plays-queue 1)))
 
@@ -21,19 +18,19 @@
     (do
       (try
         (work-fn input-work @future-count)
-        (catch Exception e (do (println e)
-                               e)))
+        (catch Exception e
+          (do
+            (println e)
+            e)))
       (swap! future-count dec)
       nil)))
 
 (defn- perform-job [input-work work-fn]
-  (if (nil? input-work)
-    (println "input-work is nil")
+  (printf "job future-count=%d job-count=%d work=%s\n" @future-count @job-count input-work)
+  (if-not (nil? input-work)
     (let [input-work (last input-work)]
-      (println "perform-job")
       (swap! future-count inc)
       (swap! job-count inc)
-      (printf "job future-count=%d job-count=%d work=%s\n" @future-count @job-count input-work)
       (run-future work-fn input-work))))
 
 (defn run-workers [concurrency index-prefix work-fn]

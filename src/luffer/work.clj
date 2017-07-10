@@ -98,8 +98,22 @@
       results
       (results-to-docs results record))))
 
-(defn bulk-index-docs [index docs]
+(defn print-bulk-index [index type doc-count first-doc last-doc]
+  (printf "%s/%s - %d - [%s, %s]\n"
+          index
+          type
+          doc-count
+          (:created_at first-doc)
+          (:created_at last-doc)))
+
+(defn bulk-index-docs [index type bulk-size docs]
   (if-not (empty? docs)
-    (->> (esbulk/bulk-index docs)
-         (esbulk/bulk-with-index-and-type es-conn index "track"))
+    (->>
+      (partition bulk-size bulk-size nil docs)
+      (map (fn [sub-docs]
+             (print-bulk-index index type (count sub-docs) (first sub-docs) (last sub-docs))
+             (->> sub-docs
+                  esbulk/bulk-index
+                  (esbulk/bulk-with-index-and-type es-conn index type))))
+      dorun)
     (println "bulk-index-docs: docs is empty")))
