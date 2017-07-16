@@ -6,6 +6,12 @@ PhishTracks Stats data exporting tool.
 Usage
 -----
 
+2017-07-15:
+
+```
+(run-workers 2 (fn [w i] (->> w luffer.work/to-pts-docs (luffer.work/bulk-index-docs "plays.c.2017-07-15.offline" "play" 1000))))
+```
+
 2017-07-09:
 
 ```

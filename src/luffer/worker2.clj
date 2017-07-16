@@ -33,7 +33,7 @@
       (swap! job-count inc)
       (run-future work-fn input-work))))
 
-(defn run-workers [concurrency index-prefix work-fn]
+(defn run-workers [concurrency work-fn]
   (reset! job-count 0)
   (reset! future-count 0)
   (while true
