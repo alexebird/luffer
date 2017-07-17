@@ -22,6 +22,8 @@ gpg2 -d ~/pts/davinci/env/dev/dbs.sh.gpg
 ```
 
 ```
+export ES_URL='http://localhost:9202'
+export DATABASE_URL='<read only slave>'
 lein repl
 (ns luffer.worker2)
 (luffer.models/populate-model-cache!)
