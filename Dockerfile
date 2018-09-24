@@ -1,7 +1,19 @@
-FROM clojure
+FROM clojure:lein-2.7.1
 MAINTAINER Alex Bird <alexebird@gmail.com>
 
-WORKDIR /root
-COPY ./target/uberjar/luffer-0.1.0-standalone.jar ./luffer-standalone.jar
-ENTRYPOINT ["java", "-jar", "luffer-standalone.jar"]
-CMD ["java", "-jar", "luffer-standalone.jar"]
+# hack to prevent null ptr ex during lein uberjar
+ENV DATABASE_URL=""
+ENV REDIS_URL=""
+ENV ES_URL=""
+
+RUN mkdir /root/luffer
+WORKDIR /root/luffer
+
+COPY project.clj .
+RUN lein deps
+
+COPY src src
+
+RUN lein compile
+
+CMD ["lein", "repl"]

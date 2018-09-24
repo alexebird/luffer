@@ -6,7 +6,8 @@
         [luffer.worker2]))
 
 (defn -main [& args]
+  (println "luffer is starting")
   (luffer.cli/handle-args args
                #(let [{:keys [concurrency work-type index]} %]
-                  ;(luffer.models/populate-model-cache!)
+                  (luffer.models/populate-model-cache!)
                   (luffer.worker2/run-workers concurrency work-type index))))

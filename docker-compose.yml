@@ -1,0 +1,13 @@
+---
+version: '3'
+services:
+  luffer:
+    image: "luffer:latest"
+    #command: -a cache-models
+    #command: -a run-workers -i plays.b.foo -c 4 -w dates
+    build: .
+    network_mode: host
+    env_file: /root/luffer.env
+  redis:
+    image: "redis:latest"
+    network_mode: host

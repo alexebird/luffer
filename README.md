@@ -6,6 +6,34 @@ PhishTracks Stats data exporting tool.
 Usage
 -----
 
+### Sunday 2018-09-23
+
+This project is on the brink of disaster.
+
+### Saturday 2018-09-22
+
+```
+# edit HOST var in provision.sh
+# edit vars in pts/davinci/env/prod/luffer.env.gpg
+./provision.sh
+```
+
+notes
+- cli interface is outdated.
+
+full instructions.
+```
+# use pts project to create the luffer box in terraform.
+#localhost
+./provision.sh
+# ssh onto remote box
+docker run -it --rm --net=host --name=luffer --env-file=../luffer.env luffer
+lein> (ns luffer.worker2)
+lein> (luffer.models/populate-model-cache!)
+lein> (run-workers 4 (fn [w i] (->> w luffer.work/to-pts-docs (luffer.work/bulk-index-docs "plays.c.2018-09-22.offline" "play" 1000))))
+```
+
+
 2017-07-15:
 
 ```

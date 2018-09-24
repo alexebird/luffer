@@ -24,10 +24,7 @@
   (let [re (re-pattern (strng/join "(.+)" ["postgresql://" ":" "@" ":" "/" ""])) ]
     (->
       (zipmap [:user :password :host :port :db]
-             (rest (re-matches re pg-uri)))
-      (merge {:ssl true
-              :sslmode "require"
-              }))))
+             (rest (re-matches re pg-uri))))))
 
 (defdb db (postgres (conn-map (System/getenv "DATABASE_URL"))))
 
@@ -132,7 +129,8 @@
    [:tour_cache       #(select-with-type-added tours)]
    [:venue_cache      #(select-with-type-added venues)]
    [:show_cache       #(select-with-type-added shows)]
-   [:track_cache      #(select-with-type-added tracks)]])
+   [:track_cache      #(select-with-type-added tracks)]
+   ])
 
 (defn- map-id-to-entity
   "Map an entity's :id to itself."
@@ -190,6 +188,13 @@
 (defn- clean-doc [doc]
   (dissoc doc :_type))
 
+(defn- print-cache-summary []
+  (doseq [[k cnt]
+          (map (fn [[k v]]
+                 [k (count @v)])
+               @models-cache)]
+    (printf "model=%s count=%d\n" k cnt)))
+
 
 ;; HELPERS
 
@@ -217,12 +222,15 @@
 ;; dMP      VMMMP" dMMMMP" dMMMMMP dMP  VMMMP"
 
 (defn populate-model-cache! []
+  (println "populate-model-cache!")
   (reset!
     models-cache
     (into {} (map (fn [[name func]]
+                    (println "starting models:" name)
                     [name (send-off-model-populate func)])
                   model-selectors)))
-  (await-populate-models))
+  (await-populate-models)
+  (print-cache-summary))
 
 (defn es-doc [model]
   (-> model
